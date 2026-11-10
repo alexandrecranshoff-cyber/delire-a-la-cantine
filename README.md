@@ -24,7 +24,8 @@ Ouvrir le projet dans Godot et lancer la scène principale (F5), ou ouvrir la ve
 
 - Clic gauche : choisir un élève de sa bande, puis une case (déplacement), une table au contact (monter), ou un pion (tir).
 - R : basculer en arrosage (au contact d'un robinet). Clic sur un chariot au contact, puis une case : le pousser.
-- Entrée : fin du tour. Clic droit ou molette enfoncée : déplacer la vue ; molette : zoom ; Q et E : tourner.
+- Entrée : fin du tour.
+- Caméra : clic droit maintenu pour tourner librement, boutons ⟲ ⟳ ou touches Q et E pour tourner par huitièmes de tour ; molette pour zoomer ; flèches ou molette enfoncée pour déplacer la vue.
 
 ## Tests
 

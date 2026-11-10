@@ -26,7 +26,13 @@ var _overlay_mesh := MultiMesh.new()
 var _cam_target := Vector3.ZERO
 var _cam_angle := 45.0
 var _cam_zoom := 26.0
-var _dragging := false
+var _panning := false
+var _rotating := false
+var _rotate_tween: Tween
+var _cam_goal := 45.0
+
+const ROTATE_STEP := 45.0
+const ROTATE_DRAG_SPEED := 0.4  # degrés par pixel
 
 
 func _ready() -> void:
@@ -51,6 +57,7 @@ func _ready() -> void:
 	add_child(hud)
 	hud.end_turn_pressed.connect(_end_turn)
 	hud.watering_toggled.connect(func(on): watering = on)
+	hud.rotate_pressed.connect(func(direction): rotate_camera(direction * ROTATE_STEP))
 	hud.log_line("Partie à %d bandes. Graine des dés : %d." % [players, s])
 	state.start_team_turn(0)
 	_refresh_all()
@@ -120,15 +127,19 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed:
 			_cam_zoom = minf(45.0, _cam_zoom + 1.5)
 			_update_camera()
-		elif mb.button_index == MOUSE_BUTTON_MIDDLE or mb.button_index == MOUSE_BUTTON_RIGHT:
-			_dragging = mb.pressed
+		elif mb.button_index == MOUSE_BUTTON_RIGHT:
+			_rotating = mb.pressed
+		elif mb.button_index == MOUSE_BUTTON_MIDDLE:
+			_panning = mb.pressed
 		elif mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and not busy:
 			var c = _mouse_cell(mb.position)
 			if c != null:
 				_click(c)
 	elif event is InputEventMouseMotion:
 		var mm := event as InputEventMouseMotion
-		if _dragging:
+		if _rotating:
+			_set_cam_angle(_cam_angle - mm.relative.x * ROTATE_DRAG_SPEED)
+		elif _panning:
 			var right := camera.global_transform.basis.x
 			var fwd := Vector3(right.z, 0, -right.x)
 			_cam_target -= (right * mm.relative.x - fwd * mm.relative.y) * _cam_zoom / 600.0
@@ -140,16 +151,30 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_ENTER, KEY_KP_ENTER: _end_turn()
-			KEY_Q: _rotate(-90)
-			KEY_E: _rotate(90)
+			KEY_Q: rotate_camera(-ROTATE_STEP)
+			KEY_E: rotate_camera(ROTATE_STEP)
 			KEY_R:
 				watering = not watering
 				hud.set_watering(watering)
 			KEY_ESCAPE: _select(null)
 
 
-func _rotate(deg: float) -> void:
-	_cam_angle += deg
+## Tourne la vue autour du point regardé, en douceur (boutons de l'interface, touches Q et E).
+func rotate_camera(deg: float) -> void:
+	# On part du cran visé par la rotation en cours, pour que plusieurs appuis s'additionnent,
+	# et on retombe toujours sur un angle net.
+	var from := _cam_angle
+	if _rotate_tween != null and _rotate_tween.is_valid():
+		from = _cam_goal
+		_rotate_tween.kill()
+	var goal := roundf((from + deg) / ROTATE_STEP) * ROTATE_STEP
+	_cam_goal = goal
+	_rotate_tween = create_tween()
+	_rotate_tween.tween_method(_set_cam_angle, _cam_angle, goal, 0.25).set_trans(Tween.TRANS_SINE)
+
+
+func _set_cam_angle(deg: float) -> void:
+	_cam_angle = deg
 	_update_camera()
 
 

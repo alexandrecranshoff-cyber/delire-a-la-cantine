@@ -5,6 +5,7 @@ extends CanvasLayer
 
 signal end_turn_pressed
 signal watering_toggled(on: bool)
+signal rotate_pressed(direction: int)
 
 const TEAM_NAMES := ["rouge", "bleue", "verte", "jaune"]
 const PAPER := Color("fbf6e6")
@@ -58,12 +59,21 @@ func _ready() -> void:
 	var buttons := HBoxContainer.new()
 	col.add_child(buttons)
 	_water_button = Button.new()
-	_water_button.text = "Arroser (R)"
+	_water_button.text = "Arroser"
+	_water_button.tooltip_text = "R"
 	_water_button.toggle_mode = true
 	_water_button.toggled.connect(func(on): watering_toggled.emit(on))
 	buttons.add_child(_water_button)
+	for spec in [["⟲", -1, "Tourner la vue à gauche (Q)"], ["⟳", 1, "Tourner la vue à droite (E)"]]:
+		var rot := Button.new()
+		rot.text = spec[0]
+		rot.tooltip_text = spec[2]
+		rot.custom_minimum_size = Vector2(36, 0)
+		rot.pressed.connect(func(): rotate_pressed.emit(spec[1]))
+		buttons.add_child(rot)
 	var end_btn := Button.new()
-	end_btn.text = "Fin du tour (Entrée)"
+	end_btn.text = "Fin du tour"
+	end_btn.tooltip_text = "Entrée"
 	end_btn.pressed.connect(func(): end_turn_pressed.emit())
 	buttons.add_child(end_btn)
 
