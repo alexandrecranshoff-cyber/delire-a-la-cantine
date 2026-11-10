@@ -36,6 +36,8 @@ Le concept de Zieuglôque (`3f48139f`) précède le strabisme : la fiche fait fo
 | `cantine_3_pop80.png` | Salle pop années 80, niveau ultérieur | f078d4ec |
 | `cuisine_1_grasse.png` | Cuisine propre et grasse, **niveau 1** | 199f4c5b |
 | `cuisine_2_chaotique.png` | Cuisine chaotique, niveau ultérieur | 1d29b4aa |
+| `planche_manteaux.png` | Dix manteaux et sacs accrochés, découpés pour les portemanteaux | voir métadonnées |
+| `planche_mural.png` | Décor mural : fenêtre, horloge, liège, affiches, menu, photo de classe, radiateur, extincteur | voir métadonnées |
 
 ## elements/
 
@@ -52,3 +54,12 @@ Le concept de Zieuglôque (`3f48139f`) précède le strabisme : la fiche fait fo
 | `ecran_de_jeu.png` | Écran de jeu, variante A épurée (barre d'état en haut, dés et stats en bas) | f07c5b42 |
 | `fiche_eleve_carnet.png` | Fiche élève façon carnet de correspondance | fbd726a8 |
 | `ecran_titre.png` | Écran titre années 80 (vérifier le lettrage) | b835118e |
+
+## animations/
+
+| Fichier | Contenu |
+|---|---|
+| `grobill_repos.glb`, `grobill_marche.glb`, `grobill_lancer.glb`, `grobill_touche.glb` | Les quatre gestes de référence, joués par Grobill (texture réduite à 64 px). `tools/extraire_animations.gd` en tire les clips partagés de `assets/animations/`. |
+
+La fabrication des personnages 3D (vues en pose A, modèle, squelette) est décrite dans
+`docs/personnages-3d.md`.
