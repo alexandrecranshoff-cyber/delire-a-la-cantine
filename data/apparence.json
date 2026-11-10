@@ -1,0 +1,21 @@
+{
+  "_note": "Apparence des pions : image (assets/hd|sd/pions/<image>.png, 5 vues) et taille en mètres (planche d'échelle de la bible graphique). vues_a_retourner : vues de la fiche dessinées vers la gauche.",
+  "eleves": {
+    "Bigleux":    {"image": "bigleux",    "taille": 1.30, "portrait": 0.46},
+    "Grobill":    {"image": "grobill",    "taille": 1.58, "portrait": 0.40},
+    "Zieuglôque": {"image": "zieugloque", "taille": 1.40, "portrait": 0.44},
+    "Ledur":      {"image": "ledur",      "taille": 1.48, "portrait": 0.36},
+    "Dudugenoux": {"image": "dudugenoux", "taille": 1.45, "portrait": 0.36},
+    "Delamensa":  {"image": "delamensa",  "taille": 1.42, "portrait": 0.36}
+  },
+  "autres": {
+    "prof":      {"image": "prof",      "taille": 1.85, "portrait": 0.24, "vues_a_retourner": [2]},
+    "cuisinier": {"image": "cuisinier", "taille": 1.90, "portrait": 0.36}
+  },
+  "neutres": [
+    {"image": "neutre_lambda",    "taille": 1.42, "portrait": 0.34},
+    {"image": "neutre_timide",    "taille": 1.35, "portrait": 0.36},
+    {"image": "neutre_casquette", "taille": 1.50, "portrait": 0.34}
+  ],
+  "chariots": {"image": "chariot", "taille": 1.15}
+}

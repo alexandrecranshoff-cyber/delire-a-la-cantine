@@ -1,0 +1,377 @@
+"""Fabrique les images du jeu à partir des visuels de référence (assets/reference/).
+
+    python3 tools/preparer_assets.py            # tout
+    python3 tools/preparer_assets.py pions      # une seule famille
+
+Deux qualités sont produites : assets/hd/ (version PC) et assets/sd/ (version web, deux fois plus petite).
+Dépendances : Pillow, numpy, scipy.
+"""
+import json
+import pathlib
+import random
+import sys
+
+import numpy as np
+from PIL import Image, ImageDraw, ImageFilter
+from scipy import ndimage
+
+import decoupe as d
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+REF = ROOT / "assets" / "reference"
+QUALITIES = {"hd": 1.0, "sd": 0.5}
+INK = (29, 29, 29)
+
+
+def out_path(quality, family, name):
+    p = ROOT / "assets" / quality / family
+    p.mkdir(parents=True, exist_ok=True)
+    return p / name
+
+
+def save_all(img, family, name, hd_height=None, hd_width=None):
+    """Enregistre l'image aux deux qualités (hauteur ou largeur HD donnée)."""
+    for quality, factor in QUALITIES.items():
+        if hd_height:
+            h = max(8, round(hd_height * factor))
+            w = max(8, round(img.width * h / img.height))
+        else:
+            w = max(8, round((hd_width or img.width) * factor))
+            h = max(8, round(img.height * w / img.width))
+        small = img.resize((w, h), Image.LANCZOS)
+        if small.mode == "RGBA":
+            small = d.bleed(small)
+        small.save(out_path(quality, family, name), optimize=True)
+
+
+# --- Personnages -------------------------------------------------------------
+
+def split_views(img, count=5):
+    """Sépare les vues d'une fiche : les colonnes vides entre les dessins servent de coupes."""
+    alpha = np.asarray(img)[:, :, 3] > 60
+    cols = alpha.sum(axis=0)
+    width = alpha.shape[1]
+    # Coupes : au creux le plus marqué autour de chaque frontière attendue.
+    filled = np.nonzero(cols > 0)[0]
+    x0, x1 = filled.min(), filled.max()
+    step = (x1 - x0) / count
+    smooth = ndimage.uniform_filter1d(cols.astype(np.float32), 9)
+    cuts = [0]
+    for k in range(1, count):
+        guess = int(x0 + step * k)
+        lo, hi = max(0, guess - int(step * 0.3)), min(width - 1, guess + int(step * 0.3))
+        cuts.append(lo + int(np.argmin(smooth[lo:hi])))
+    cuts.append(width)
+    views = []
+    for k in range(count):
+        part = img.crop((cuts[k], 0, cuts[k + 1], img.height))
+        a = np.asarray(part)[:, :, 3] > 60
+        # On ne garde que le plus gros morceau et ce qui le touche presque (lacets, mèches).
+        labels, n = ndimage.label(ndimage.binary_dilation(a, iterations=10))
+        if n > 1:
+            sizes = ndimage.sum(a, labels, range(1, n + 1))
+            keep = labels == (1 + int(np.argmax(sizes)))
+            arr = np.asarray(part).copy()
+            arr[:, :, 3] = np.where(keep, arr[:, :, 3], 0)
+            part = Image.fromarray(arr, "RGBA")
+            a = np.asarray(part)[:, :, 3] > 60
+        ys, xs = np.nonzero(a)
+        views.append(part.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1)))
+    return views
+
+
+def open_legs(view):
+    """Retire le blanc du fond resté enfermé entre les jambes (moitié basse du dessin seulement)."""
+    arr = np.asarray(view).copy()
+    rgb = arr[:, :, :3].astype(np.int16)
+    white = (rgb.min(axis=2) >= 244) & (arr[:, :, 3] > 200)
+    labels, n = ndimage.label(white)
+    h = arr.shape[0]
+    for i, sl in enumerate(ndimage.find_objects(labels), start=1):
+        area = int((labels[sl] == i).sum())
+        if sl[0].start > h * 0.52 and area > 500:
+            region = ndimage.binary_dilation(labels == i, iterations=2)
+            arr[:, :, 3] = np.where(region, 0, arr[:, :, 3])
+    return Image.fromarray(arr, "RGBA")
+
+
+def build_pawns():
+    look = json.loads((ROOT / "data" / "apparence.json").read_text(encoding="utf-8"))
+    entries = list(look["eleves"].values()) + list(look["autres"].values()) + look["neutres"]
+    meta = {}
+    cell_h = 640
+    pad = 40
+    for e in entries:
+        name = e["image"]
+        rgb = d.load_rgb(REF / "personnages" / f"fiche_{name}.png")
+        views = [open_legs(v) for v in split_views(d.cutout(rgb))]
+        for k in e.get("vues_a_retourner", []):
+            views[k] = views[k].transpose(Image.FLIP_LEFT_RIGHT)
+        tallest = max(v.height for v in views)
+        scale = (cell_h - 2 * pad) / tallest
+        views = [v.resize((max(1, round(v.width * scale)), max(1, round(v.height * scale))), Image.LANCZOS) for v in views]
+        cell_w = max(v.width for v in views) + 2 * pad
+        cell_w += cell_w % 2
+        atlas = Image.new("RGBA", (cell_w * 5, cell_h), (0, 0, 0, 0))
+        for k, v in enumerate(views):
+            atlas.alpha_composite(v, (k * cell_w + (cell_w - v.width) // 2, cell_h - pad - v.height))
+        save_all(atlas, "pions", f"{name}.png", hd_height=cell_h)
+        meta[name] = {"aspect": round(cell_w / cell_h, 4), "marge": round(pad / cell_h, 4)}
+        # Portrait : le haut de la vue de face, dans un carré.
+        front = views[0]
+        side = round(front.height * e["portrait"])
+        cx = front.width // 2
+        box = (cx - side // 2, 0, cx - side // 2 + side, side)
+        portrait = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+        portrait.alpha_composite(front.crop((max(0, box[0]), 0, min(front.width, box[2]), side)), (max(0, -box[0]), 0))
+        save_all(portrait, "portraits", f"{name}.png", hd_height=256)
+        print("pion", name, atlas.size)
+    (ROOT / "data" / "pions_images.json").write_text(json.dumps(
+        {"_note": "Généré par tools/preparer_assets.py : proportions des planches de pions (5 vues côte à côte).", "images": meta},
+        ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+
+
+# --- Accessoires, projectiles, effets ----------------------------------------
+
+def pick(boxes, x, y):
+    """Dessin dont le centre est le plus proche du point attendu (coordonnées de la planche)."""
+    return min(boxes, key=lambda b: ((b[0] + b[2]) / 2 - x) ** 2 + ((b[1] + b[3]) / 2 - y) ** 2)
+
+
+def remove_enclosed_white(img, min_area=600):
+    arr = np.asarray(img).copy()
+    rgb = arr[:, :, :3].astype(np.int16)
+    white = (rgb.min(axis=2) >= 248) & (arr[:, :, 3] > 200)
+    labels, n = ndimage.label(white)
+    for i, sl in enumerate(ndimage.find_objects(labels), start=1):
+        if int((labels[sl] == i).sum()) > min_area:
+            region = ndimage.binary_dilation(labels == i, iterations=2)
+            arr[:, :, 3] = np.where(region, 0, arr[:, :, 3])
+    return Image.fromarray(arr, "RGBA")
+
+
+def build_props():
+    rgb = d.load_rgb(REF / "elements" / "accessoires.png")
+    sheet = d.cutout(rgb, extra_colors=[((200, 185, 166), 14)])
+    boxes, labels = d.components(sheet, merge=10)
+    wanted = {  # nom : (centre attendu, hauteur HD, retirer le blanc enfermé)
+        "bac": ((1870, 370), 512, True),
+        "chariot": ((2400, 410), 512, True),
+        "lavabo": ((360, 1100), 512, True),
+        "plateau_rouge": ((1710, 900), 128, False),
+        "plateau_bleu": ((2340, 915), 128, False),
+        "assiettes": ((1605, 1270), 160, False),
+        "pichet": ((2010, 1230), 192, False),
+        "verre": ((2160, 1345), 96, False),
+    }
+    for name, (center, height, holes) in wanted.items():
+        img = d.crop_component(sheet, labels, pick(boxes, *center))
+        if holes:
+            img = remove_enclosed_white(img)
+        a = np.asarray(img)[:, :, 3] > 60
+        ys, xs = np.nonzero(a)
+        img = img.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
+        save_all(img, "accessoires", f"{name}.png", hd_height=height)
+        print("accessoire", name, img.size)
+
+
+def build_projectiles():
+    rgb = d.load_rgb(REF / "elements" / "projectiles.png")
+    sheet = d.cutout(rgb)
+    boxes, labels = d.components(sheet, merge=22, min_area=6000)
+    keys = [["2", "3", "4", "5"], ["6", "7", "8", "9"], ["10", "11", "12", "robinet"]]
+    for r in range(3):
+        for c in range(4):
+            box = pick(boxes, 2752 * (c + 0.5) / 4, 1536 * (r + 0.5) / 3)
+            img = d.crop_component(sheet, labels, box)
+            save_all(img, "projectiles", f"projectile_{keys[r][c]}.png", hd_height=192)
+    print("projectiles", len(boxes))
+
+
+def build_effects():
+    rgb = d.load_rgb(REF / "elements" / "effets_bd.png")
+    sheet = d.cutout(rgb)
+    boxes, labels = d.components(sheet, merge=14, min_area=4000)
+    wanted = {
+        "splatch": ((524, 303), 320), "bloup": ((473, 760), 300), "floc": ((1266, 778), 300),
+        "paf": ((377, 1235), 320), "schlurp": ((1147, 1248), 300),
+        "tache_orange": ((1283, 291), 256), "tache_verte": ((2493, 178), 160), "tache_creme": ((2460, 419), 160),
+        "tache_marron": ((2420, 793), 256), "nuage": ((1927, 1342), 160),
+        "bulle_cri": ((1897, 314), 320), "bulle_ovale": ((1896, 761), 256), "bulle_pensee": ((2423, 1251), 256),
+    }
+    for name, (center, height) in wanted.items():
+        img = d.crop_component(sheet, labels, pick(boxes, *center))
+        if name.startswith("bulle") or name == "nuage":
+            # L'intérieur des bulles est du même blanc que le fond : on le rend opaque et blanc.
+            a = np.asarray(img)[:, :, 3] > 60
+            filled = ndimage.binary_fill_holes(a)
+            arr = np.asarray(img).copy()
+            inside = filled & ~a
+            arr[inside] = (255, 255, 255, 255)
+            img = Image.fromarray(arr, "RGBA")
+        save_all(img, "effets", f"{name}.png", hd_height=height)
+    print("effets", len(boxes))
+
+
+# --- Écrans --------------------------------------------------------------------
+
+def build_screens():
+    title = Image.open(REF / "interface" / "ecran_titre.png").convert("RGB")
+    for quality, width in (("hd", 1920), ("sd", 1280)):
+        img = title.resize((width, round(title.height * width / title.width)), Image.LANCZOS)
+        img.save(out_path(quality, "ecrans", "titre.webp"), quality=86 if quality == "hd" else 78, method=6)
+    print("ecrans")
+
+
+# --- Textures dessinées -------------------------------------------------------
+
+def speckle(img, rng, count, colors, size=(1, 3)):
+    draw = ImageDraw.Draw(img, "RGBA")
+    for _ in range(count):
+        x, y = rng.randrange(img.width), rng.randrange(img.height)
+        r = rng.uniform(*size)
+        draw.ellipse((x - r, y - r, x + r, y + r), fill=rng.choice(colors))
+
+
+def checker(tiles, px, color_a, color_b, grout, rng, stains=()):
+    """Carrelage en damier (raccordable), avec joints à l'encre, nuances et petites taches."""
+    size = tiles * px
+    img = Image.new("RGB", (size, size), grout)
+    draw = ImageDraw.Draw(img, "RGBA")
+    g = max(2, px // 28)
+    for ty in range(tiles):
+        for tx in range(tiles):
+            base = color_a if (tx + ty) % 2 == 0 else color_b
+            k = rng.uniform(-9, 9)
+            col = tuple(int(max(0, min(255, c + k))) for c in base)
+            x, y = tx * px, ty * px
+            draw.rectangle((x + g, y + g, x + px - g - 1, y + px - g - 1), fill=col)
+            # Reflet clair en haut à gauche, ombre en bas à droite : aplat BD.
+            draw.line((x + g + 2, y + g + 2, x + px - g - 4, y + g + 2), fill=(255, 255, 255, 70), width=max(1, g // 2))
+            draw.line((x + g + 2, y + px - g - 3, x + px - g - 3, y + px - g - 3), fill=(0, 0, 0, 38), width=max(1, g // 2))
+            if rng.random() < 0.18:  # éclat ou fêlure
+                x0, y0 = x + rng.randrange(g * 2, px - g * 2), y + rng.randrange(g * 2, px - g * 2)
+                draw.line((x0, y0, x0 + rng.randrange(-px // 4, px // 4), y0 + rng.randrange(-px // 4, px // 4)), fill=(*INK, 110), width=1)
+    speckle(img, rng, size * size // 900, [(0, 0, 0, 26), (255, 255, 255, 30)])
+    for color, count in stains:
+        for _ in range(count):
+            x, y, r = rng.randrange(size), rng.randrange(size), rng.uniform(px * 0.12, px * 0.4)
+            blob = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+            bd = ImageDraw.Draw(blob)
+            for _ in range(6):
+                ox, oy, rr = rng.uniform(-r, r) * 0.6, rng.uniform(-r, r) * 0.6, r * rng.uniform(0.4, 0.9)
+                bd.ellipse((x + ox - rr, y + oy - rr, x + ox + rr, y + oy + rr), fill=color)
+            img.paste(blob, (0, 0), blob.filter(ImageFilter.GaussianBlur(1.2)))
+    return img
+
+
+def halftone(img, color, spacing, radius):
+    draw = ImageDraw.Draw(img, "RGBA")
+    row = 0
+    for y in range(0, img.height + spacing, spacing):
+        off = spacing // 2 if row % 2 else 0
+        for x in range(-spacing, img.width + spacing, spacing):
+            draw.ellipse((x + off - radius, y - radius, x + off + radius, y + radius), fill=color)
+        row += 1
+
+
+def build_textures():
+    rng = random.Random(1984)
+    floor = checker(8, 128, (88, 184, 181), (245, 236, 208), (58, 104, 108), rng, stains=[((120, 110, 80, 40), 5)])
+    save_all(floor, "textures", "sol_salle.png", hd_width=1024)
+    kitchen = checker(8, 128, (62, 62, 66), (238, 232, 214), (40, 40, 42), rng,
+                      stains=[((150, 120, 40, 70), 10), ((110, 130, 50, 60), 5), ((120, 60, 30, 60), 4)])
+    save_all(kitchen, "textures", "sol_cuisine.png", hd_width=1024)
+
+    # Mur de la salle : jaune, trame de points, bande turquoise en bas, plinthe sombre. Raccord horizontal.
+    wall = Image.new("RGB", (512, 512), (244, 200, 74))
+    halftone(wall, (226, 160, 40, 90), 16, 3)
+    wd = ImageDraw.Draw(wall, "RGBA")
+    wd.rectangle((0, 300, 512, 512), fill=(86, 176, 172))
+    wd.line((0, 300, 512, 300), fill=INK, width=5)
+    wd.rectangle((0, 470, 512, 512), fill=(52, 96, 100))
+    wd.line((0, 470, 512, 470), fill=INK, width=4)
+    speckle(wall, rng, 260, [(0, 0, 0, 24), (255, 255, 255, 34)], (1, 2.5))
+    save_all(wall, "textures", "mur_salle.png", hd_width=512)
+
+    # Mur de la cuisine : faïence blanche et coulures.
+    tiles = Image.new("RGB", (512, 512), (236, 234, 224))
+    td = ImageDraw.Draw(tiles, "RGBA")
+    for k in range(0, 513, 64):
+        td.line((k, 0, k, 512), fill=(120, 124, 120), width=3)
+        td.line((0, k, 512, k), fill=(120, 124, 120), width=3)
+    for _ in range(14):
+        x, y, length = rng.randrange(512), rng.randrange(380), rng.randrange(40, 130)
+        td.line((x, y, x + rng.randrange(-4, 4), y + length), fill=(150, 130, 60, 80), width=rng.randrange(3, 8))
+    td.rectangle((0, 470, 512, 512), fill=(70, 70, 74))
+    td.line((0, 470, 512, 470), fill=INK, width=4)
+    save_all(tiles, "textures", "mur_cuisine.png", hd_width=512)
+
+    # Dessus de table rose (10 × 3 cases) : contour à l'encre, reflets, rayures.
+    table = Image.new("RGB", (1280, 384), (243, 150, 170))
+    bd = ImageDraw.Draw(table, "RGBA")
+    bd.rectangle((0, 0, 1279, 383), outline=INK, width=10)
+    bd.rectangle((12, 12, 1267, 371), outline=(255, 205, 215), width=5)
+    for _ in range(46):
+        x, y = rng.randrange(40, 1240), rng.randrange(40, 344)
+        bd.line((x, y, x + rng.randrange(-70, 70), y + rng.randrange(-16, 16)), fill=(200, 100, 125, 130), width=2)
+    for _ in range(7):
+        x = rng.randrange(60, 1100)
+        bd.polygon([(x, 30), (x + 90, 30), (x + 30, 354), (x - 60, 354)], fill=(255, 255, 255, 26))
+    speckle(table, rng, 400, [(160, 70, 95, 50), (255, 255, 255, 50)], (1, 2.5))
+    save_all(table, "textures", "table.png", hd_width=1280)
+
+    # Bois (bancs, portes), inox (bacs, pieds).
+    wood = Image.new("RGB", (256, 256), (150, 96, 56))
+    od = ImageDraw.Draw(wood, "RGBA")
+    for y in range(0, 256, 6):
+        od.line((0, y + rng.randrange(-2, 2), 256, y + rng.randrange(-2, 2)), fill=(110, 66, 36, rng.randrange(60, 150)), width=rng.randrange(1, 3))
+    for k in range(0, 257, 64):
+        od.line((0, k, 256, k), fill=INK, width=3)
+    save_all(wood, "textures", "bois.png", hd_width=256)
+    steel = Image.new("RGB", (256, 256), (176, 186, 192))
+    sd_ = ImageDraw.Draw(steel, "RGBA")
+    for x in range(0, 256, 3):
+        sd_.line((x, 0, x, 256), fill=(255, 255, 255, rng.randrange(0, 46)), width=1)
+    for _ in range(5):
+        x = rng.randrange(256)
+        sd_.line((x, 0, x + 60, 256), fill=(255, 255, 255, 60), width=rng.randrange(6, 18))
+    save_all(steel, "textures", "inox.png", hd_width=256)
+
+    # Porte battante verte à hublots, vue de face (2 cases de large).
+    door = Image.new("RGB", (512, 540), (96, 150, 96))
+    dd = ImageDraw.Draw(door, "RGBA")
+    dd.rectangle((0, 0, 511, 539), outline=INK, width=12)
+    dd.rectangle((14, 14, 497, 525), outline=(70, 116, 72), width=8)
+    dd.line((256, 0, 256, 540), fill=INK, width=8)
+    for cx in (140, 372):
+        dd.ellipse((cx - 62, 90, cx + 62, 214), fill=(150, 160, 160), outline=INK, width=8)
+        dd.ellipse((cx - 44, 108, cx + 44, 196), fill=(170, 220, 232), outline=INK, width=5)
+        dd.line((cx - 26, 170, cx + 14, 126), fill=(255, 255, 255, 200), width=7)
+        dd.rectangle((cx - 90, 430, cx + 90, 512), fill=(176, 186, 192), outline=INK, width=5)
+    dd.rectangle((214, 250, 240, 330), fill=(176, 186, 192), outline=INK, width=5)
+    dd.rectangle((272, 250, 298, 330), fill=(176, 186, 192), outline=INK, width=5)
+    speckle(door, rng, 220, [(0, 0, 0, 34), (255, 255, 255, 30)], (1, 3))
+    save_all(door, "textures", "porte.png", hd_width=512)
+
+    # Papier de cahier à petits carreaux (raccordable) pour l'interface.
+    paper = Image.new("RGB", (256, 256), (251, 247, 232))
+    pd = ImageDraw.Draw(paper, "RGBA")
+    for k in range(0, 256, 32):
+        pd.line((k, 0, k, 256), fill=(150, 190, 215, 120), width=1)
+        pd.line((0, k, 256, k), fill=(150, 190, 215, 120), width=1)
+    for k in range(0, 256, 128):
+        pd.line((0, k, 256, k), fill=(120, 160, 200, 170), width=2)
+    speckle(paper, rng, 160, [(120, 100, 60, 16)], (1, 4))
+    save_all(paper, "textures", "papier.png", hd_width=256)
+    print("textures")
+
+
+BUILDERS = {
+    "pions": build_pawns, "accessoires": build_props, "projectiles": build_projectiles,
+    "effets": build_effects, "ecrans": build_screens, "textures": build_textures,
+}
+
+if __name__ == "__main__":
+    for key in (sys.argv[1:] or BUILDERS.keys()):
+        BUILDERS[key]()

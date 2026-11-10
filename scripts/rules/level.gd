@@ -73,4 +73,6 @@ func build_state(data: GameData, dice: DiceRoller, players: int) -> GameState:
 	for u in state.units:
 		u.loaded = u.kind == Unit.Kind.STUDENT
 	state.team_count = assignment.size()
+	for key in raw["portes"].keys():
+		state.doors[key] = door_cells(key)
 	return state

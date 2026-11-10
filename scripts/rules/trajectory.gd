@@ -17,6 +17,8 @@ static func cells(from: Vector2i, to: Vector2i) -> Array[Vector2i]:
 ## La droite « réelle » entre les centres des deux cases traverse-t-elle un mur ?
 ## Sert aussi à la ligne de vue.
 static func blocked_by_wall(board: Board, from: Vector2i, to: Vector2i) -> bool:
+	if board.walls_in_rect(from, to) == 0:
+		return false
 	var a := Vector2(from)
 	var b := Vector2(to)
 	var samples := maxi(1, ceili(a.distance_to(b) * 8.0))

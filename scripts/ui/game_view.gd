@@ -1,56 +1,74 @@
 class_name GameView
 extends Node3D
-## Scène de partie : affiche l'état (GameState) et traduit la souris en actions du moteur de règles.
-## Aucune règle ici : tout passe par scripts/rules/.
+## Scène de partie : affiche l'état (GameState), traduit la souris en actions (GameActions) et met en
+## scène les événements renvoyés par les règles. Aucune règle ici : tout passe par scripts/rules/ et scripts/ai/.
+
+signal back_to_menu
+signal replay
 
 const LEVEL_PATH := "res://data/niveaux/niveau_1.json"
-const STEP_TIME := 0.09
-
-@export var players := 2
-@export var seed_value := 0
+const STEP_TIME := 0.085
+const ROTATE_STEP := 45.0
+const ROTATE_DRAG_SPEED := 0.4  # degrés par pixel
 
 var state: GameState
 var level: Level
 var hud: Hud
 var board_view: BoardView
+var fx: Effects
 var camera: Camera3D
 var pawns := {}  # id -> PawnView
 
 var selected: Unit
 var watering := false
 var push_cart: Unit
-var busy := false
+var busy := true
+var over := false
+var viewer_team := 0          # bande dont on montre le point de vue (brouillard)
+var human_teams: Array[int] = []
+var opponents := {}           # bande -> Opponent
 
 var _overlay := MultiMeshInstance3D.new()
 var _overlay_mesh := MultiMesh.new()
 var _cam_target := Vector3.ZERO
 var _cam_angle := 45.0
-var _cam_zoom := 26.0
+var _cam_zoom := 29.0
 var _panning := false
 var _rotating := false
 var _rotate_tween: Tween
 var _cam_goal := 45.0
-
-const ROTATE_STEP := 45.0
-const ROTATE_DRAG_SPEED := 0.4  # degrés par pixel
+var _hovered: PawnView
+var _shake := 0.0
+var _stats := {}
+var _last_turn_shown := 0
+var _tables_stocked := true
 
 
 func _ready() -> void:
 	var data := GameData.load_default()
 	level = Level.load_file(LEVEL_PATH)
-	var s := seed_value if seed_value != 0 else int(Time.get_unix_time_from_system())
-	state = level.build_state(data, DiceRoller.new(s), players)
+	var s := GameConfig.seed_value if GameConfig.seed_value != 0 else int(Time.get_unix_time_from_system())
+	var ai: Array = [1] if GameConfig.solo else []
+	state = GameSetup.new_game(level, data, s, GameConfig.players, ai, GameConfig.difficulty if GameConfig.solo else "")
+	if not GameConfig.solo:
+		state.options["prof_periode"] = int(GameSetup.difficulties()["normal"]["prof_periode"])
+	for t in state.team_count:
+		if state.ai_teams.has(t):
+			var profile: Dictionary = GameSetup.difficulties()[GameConfig.difficulty]["ia"]
+			opponents[t] = Opponent.new(t, profile, s + 77 * (t + 1))
+		else:
+			human_teams.append(t)
+		_stats[t] = {"tirs": 0, "touches": 0, "satures": 0}
+	viewer_team = human_teams[0] if not human_teams.is_empty() else 0
 
 	_setup_environment()
 	board_view = BoardView.new()
 	add_child(board_view)
-	board_view.build(state.board)
+	board_view.build(state.board, level)
+	fx = Effects.new()
+	add_child(fx)
 	for u in state.units:
-		var p := PawnView.new()
-		add_child(p)
-		p.setup(u)
-		pawns[u.id] = p
-	_update_camera()
+		_add_pawn(u)
 	_setup_overlay()
 
 	hud = Hud.new()
@@ -58,52 +76,166 @@ func _ready() -> void:
 	hud.end_turn_pressed.connect(_end_turn)
 	hud.watering_toggled.connect(func(on): watering = on)
 	hud.rotate_pressed.connect(func(direction): rotate_camera(direction * ROTATE_STEP))
-	hud.log_line("Partie à %d bandes. Graine des dés : %d." % [players, s])
-	state.start_team_turn(0)
+	hud.project_pressed.connect(_project)
+	hud.unit_picked.connect(func(id): _pick(state.get_unit(id)))
+	hud.menu_pressed.connect(func(): back_to_menu.emit())
+	hud.replay_pressed.connect(func(): replay.emit())
+	hud.speed_toggled.connect(_set_fast)
+	hud.set_fast(GameConfig.fast)
+	_set_fast(GameConfig.fast)
+	hud.log_line("[b]Service de midi.[/b] Graine des dés : %d." % s)
+	Sound.music("musique_partie")
+	Sound.ambience(true)
+	_update_camera()
 	_refresh_all()
+	_intro()
+
+
+func _exit_tree() -> void:
+	Engine.time_scale = 1.0
+
+
+func _intro() -> void:
+	_last_turn_shown = 1
+	await hud.show_banner("À TABLE !", BD.YELLOW, "Tour 1 : %s" % BD.team_name(state.current_team).to_lower(), 1.0)
+	if human_teams.size() > 1:
+		await hud.show_pass_screen(state.current_team)
+	busy = false
+	_select_first()
+	for a in OS.get_cmdline_user_args():
+		if a == "rapide":
+			_set_fast(true)
+			hud.set_fast(true)
+		elif a.begins_with("survol="):
+			# Contrôle visuel : simule le survol d'une case.
+			var xy := a.split("=")[1].split(",")
+			_hover(Vector2i(int(xy[0]), int(xy[1])))
+	if OS.get_cmdline_user_args().has("auto"):
+		_autoplay()
+
+
+## Démonstration et essais : l'ordinateur joue aussi la bande du joueur, en passant par l'interface.
+func _autoplay() -> void:
+	var bot := Opponent.new(human_teams[0], GameSetup.difficulties()["normal"]["ia"], 4242)
+	while not over:
+		if not _can_act():
+			await _wait(0.2)
+			continue
+		var events := bot.play_next(state)
+		if events.is_empty():
+			await _end_turn()
+		else:
+			if not events.is_empty() and events[0].has("id") and pawns.has(events[0]["id"]):
+				_select(state.get_unit(events[0]["id"]))
+			await _run(events)
+			await _wait(0.1)
+
+
+func _add_pawn(u: Unit) -> PawnView:
+	var p := PawnView.new()
+	add_child(p)
+	p.setup(u)
+	# Au départ, chacun regarde sa table (ou la salle).
+	var look := Vector2(0, -1)
+	for n in Board.neighbors8(u.pos):
+		if state.board.is_table(n):
+			look = Vector2(n - u.pos)
+			break
+	if u.kind == Unit.Kind.TEACHER:
+		look = Vector2(state.board.width / 2.0 - u.pos.x, state.board.height / 2.0 - u.pos.y)
+	p.set_facing(look)
+	p.face_camera(_cam_angle)
+	pawns[u.id] = p
+	return p
 
 
 func _setup_environment() -> void:
+	var hd := GameAssets.is_hd()
 	var env := WorldEnvironment.new()
 	env.environment = Environment.new()
 	env.environment.background_mode = Environment.BG_COLOR
 	env.environment.background_color = Color("3b2f4a")
 	env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.environment.ambient_light_color = Color(0.75, 0.75, 0.8)
+	env.environment.ambient_light_color = Color(0.86, 0.84, 0.9)
+	env.environment.ambient_light_energy = 0.62
+	env.environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	add_child(env)
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-55, 30, 0)
-	sun.light_energy = 0.9
+	sun.rotation_degrees = Vector3(-58, 32, 0)
+	sun.light_energy = 0.46
+	sun.light_color = Color(1.0, 0.97, 0.9)
+	# Pas d'ombres calculées : celles des pions et des tables sont dessinées, comme en BD.
+	# La version PC ajoute l'anticrénelage.
+	get_viewport().msaa_3d = Viewport.MSAA_4X if hd else Viewport.MSAA_DISABLED
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("amb="):
+			env.environment.ambient_light_energy = float(a.split("=")[1])
+		elif a.begins_with("sun="):
+			sun.light_energy = float(a.split("=")[1])
 	add_child(sun)
 	camera = Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camera.near = 1.0
+	camera.far = 200.0
 	add_child(camera)
-	_cam_target = Vector3(state.board.width / 2.0, 0, state.board.height / 2.0 - 4)
-	_update_camera()
+	_cam_target = Vector3(state.board.width / 2.0 + 1.5, 0, state.board.height / 2.0 + 1.5)
+	# Réglages de contrôle visuel : zoom=12 angle=90 cible=10,8
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("zoom="):
+			_cam_zoom = float(a.split("=")[1])
+		elif a.begins_with("angle="):
+			_cam_angle = float(a.split("=")[1])
+		elif a.begins_with("cible="):
+			var xy := a.split("=")[1].split(",")
+			_cam_target = Vector3(float(xy[0]), 0, float(xy[1]))
 
 
 func _update_camera() -> void:
 	camera.size = _cam_zoom
 	var dir := Vector3(sin(deg_to_rad(_cam_angle)), 1.1, cos(deg_to_rad(_cam_angle))).normalized()
-	camera.position = _cam_target + dir * 40.0
-	camera.look_at(_cam_target, Vector3.UP)
+	var shake := Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * _shake
+	camera.position = _cam_target + dir * 60.0 + shake
+	camera.look_at(_cam_target + shake, Vector3.UP)
 	for p in pawns.values():
 		p.face_camera(_cam_angle)
+	if board_view != null:
+		board_view.face_camera(_cam_angle)
+	if fx != null:
+		fx.cam_angle = _cam_angle
 
 
 func _setup_overlay() -> void:
 	var quad := PlaneMesh.new()
-	quad.size = Vector2(0.9, 0.9)
+	quad.size = Vector2(0.92, 0.92)
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.vertex_color_use_as_albedo = true
+	mat.albedo_texture = _cell_texture()
 	quad.material = mat
 	_overlay_mesh.transform_format = MultiMesh.TRANSFORM_3D
 	_overlay_mesh.use_colors = true
 	_overlay_mesh.mesh = quad
 	_overlay.multimesh = _overlay_mesh
+	_overlay.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_overlay)
+
+
+## Case surlignée : carré arrondi, bord plus marqué que le fond.
+func _cell_texture() -> Texture2D:
+	var size := 64
+	var img := Image.create(size, size, true, Image.FORMAT_RGBA8)
+	for y in size:
+		for x in size:
+			var dx := maxf(absf(x - size / 2.0 + 0.5) - (size / 2.0 - 10.0), 0.0)
+			var dy := maxf(absf(y - size / 2.0 + 0.5) - (size / 2.0 - 10.0), 0.0)
+			var dist := sqrt(dx * dx + dy * dy)
+			var a := 0.0
+			if dist <= 8.0:
+				a = 1.0 if dist >= 4.5 else 0.55
+			img.set_pixel(x, y, Color(1, 1, 1, a))
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
 
 
 ## Surligne des cases : liste de [Vector2i, Color].
@@ -111,9 +243,22 @@ func _show_cells(cells: Array) -> void:
 	_overlay_mesh.instance_count = cells.size()
 	for i in cells.size():
 		var c: Vector2i = cells[i][0]
-		var h := BoardView.TABLE_HEIGHT + 0.02 if state.board.is_table(c) else 0.07
+		var h := BoardView.TABLE_HEIGHT + 0.025 if state.board.is_table(c) else 0.03
 		_overlay_mesh.set_instance_transform(i, Transform3D(Basis(), BoardView.cell_to_world(c, h)))
 		_overlay_mesh.set_instance_color(i, cells[i][1])
+
+
+func _t(seconds: float) -> float:
+	return seconds
+
+
+func _wait(seconds: float) -> void:
+	await get_tree().create_timer(maxf(0.01, seconds)).timeout
+
+
+func _set_fast(on: bool) -> void:
+	GameConfig.fast = on
+	Engine.time_scale = 2.2 if on else 1.0
 
 
 # --- Entrées -----------------------------------------------------------------
@@ -125,13 +270,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			_cam_zoom = maxf(8.0, _cam_zoom - 1.5)
 			_update_camera()
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed:
-			_cam_zoom = minf(45.0, _cam_zoom + 1.5)
+			_cam_zoom = minf(46.0, _cam_zoom + 1.5)
 			_update_camera()
 		elif mb.button_index == MOUSE_BUTTON_RIGHT:
 			_rotating = mb.pressed
 		elif mb.button_index == MOUSE_BUTTON_MIDDLE:
 			_panning = mb.pressed
-		elif mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and not busy:
+		elif mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and _can_act():
 			var c = _mouse_cell(mb.position)
 			if c != null:
 				_click(c)
@@ -143,26 +288,40 @@ func _unhandled_input(event: InputEvent) -> void:
 			var right := camera.global_transform.basis.x
 			var fwd := Vector3(right.z, 0, -right.x)
 			_cam_target -= (right * mm.relative.x - fwd * mm.relative.y) * _cam_zoom / 600.0
+			_clamp_target()
 			_update_camera()
-		elif not busy:
+		elif _can_act():
 			var c = _mouse_cell(mm.position)
 			if c != null:
 				_hover(c)
 	elif event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_ENTER, KEY_KP_ENTER: _end_turn()
-			KEY_Q: rotate_camera(-ROTATE_STEP)
+			KEY_Q, KEY_A: rotate_camera(-ROTATE_STEP)
 			KEY_E: rotate_camera(ROTATE_STEP)
 			KEY_R:
-				watering = not watering
-				hud.set_watering(watering)
-			KEY_ESCAPE: _select(null)
+				if _can_act():
+					watering = not watering
+					hud.set_watering(watering)
+			KEY_P: _project()
+			KEY_TAB: _select_next()
+			KEY_V:
+				_set_fast(not GameConfig.fast)
+				hud.set_fast(GameConfig.fast)
+			KEY_F1, KEY_H: hud.toggle_help()
+			KEY_ESCAPE:
+				if hud.help_open():
+					hud.toggle_help()
+				else:
+					_select(null)
+
+
+func _can_act() -> bool:
+	return not busy and not over and human_teams.has(state.current_team)
 
 
 ## Tourne la vue autour du point regardé, en douceur (boutons de l'interface, touches Q et E).
 func rotate_camera(deg: float) -> void:
-	# On part du cran visé par la rotation en cours, pour que plusieurs appuis s'additionnent,
-	# et on retombe toujours sur un angle net.
 	var from := _cam_angle
 	if _rotate_tween != null and _rotate_tween.is_valid():
 		from = _cam_goal
@@ -178,14 +337,24 @@ func _set_cam_angle(deg: float) -> void:
 	_update_camera()
 
 
+func _clamp_target() -> void:
+	_cam_target.x = clampf(_cam_target.x, -2.0, state.board.width + 2.0)
+	_cam_target.z = clampf(_cam_target.z, -2.0, state.board.height + 2.0)
+
+
 func _process(delta: float) -> void:
 	var move := Vector2(
 		Input.get_axis("ui_left", "ui_right"),
 		Input.get_axis("ui_up", "ui_down"))
+	var real_delta := delta / maxf(0.01, Engine.time_scale)
 	if move != Vector2.ZERO:
 		var right := camera.global_transform.basis.x
 		var fwd := Vector3(right.z, 0, -right.x)
-		_cam_target += (right * move.x - fwd * move.y) * delta * 15.0
+		_cam_target += (right * move.x - fwd * move.y) * real_delta * 18.0
+		_clamp_target()
+		_update_camera()
+	elif _shake > 0.0:
+		_shake = maxf(0.0, _shake - real_delta * 0.6)
 		_update_camera()
 
 
@@ -206,14 +375,39 @@ func _mouse_cell(screen: Vector2):
 	return null
 
 
-# --- Actions ------------------------------------------------------------------
+## Amène la caméra sur un point s'il est hors du centre de l'écran (actions de l'ordinateur).
+func _focus(world: Vector3, force: bool = false) -> void:
+	var screen := camera.unproject_position(world)
+	var size := get_viewport().get_visible_rect().size
+	var inner := Rect2(size * Vector2(0.14, 0.14), size * Vector2(0.72, 0.56))
+	if inner.has_point(screen) and not force:
+		return
+	# Le bas de l'écran est pris par l'interface : on vise un peu plus bas que le point à montrer.
+	var toward := Vector3(sin(deg_to_rad(_cam_angle)), 0, cos(deg_to_rad(_cam_angle)))
+	var goal := Vector3(world.x, 0, world.z) + toward * _cam_zoom * 0.1
+	var tw := create_tween()
+	tw.tween_method(func(v: Vector3):
+		_cam_target = v
+		_update_camera()
+	, _cam_target, goal, 0.35).set_trans(Tween.TRANS_SINE)
+	await tw.finished
+
+
+# --- Sélection et survol ---------------------------------------------------------
 
 func _is_mine(u: Unit) -> bool:
-	return u != null and u.team == state.current_team and u.is_controllable()
+	return u != null and u.team == state.current_team and u.is_controllable() and u.kind != Unit.Kind.CART
+
+
+func _visible_unit_at(c: Vector2i) -> Unit:
+	var u := state.unit_at(c)
+	if u != null and pawns.has(u.id) and not pawns[u.id].shown:
+		return null
+	return u
 
 
 func _select(u: Unit) -> void:
-	if selected != null:
+	if selected != null and pawns.has(selected.id):
 		pawns[selected.id].set_selected(false)
 	selected = u
 	push_cart = null
@@ -222,176 +416,733 @@ func _select(u: Unit) -> void:
 	_refresh_all()
 
 
+func _pick(u: Unit) -> void:
+	if u == null or not _can_act() or not _is_mine(u):
+		return
+	_select(u)
+	_focus(pawns[u.id].global_position)
+
+
+func _select_first() -> void:
+	if not human_teams.has(state.current_team):
+		return
+	for u in state.units:
+		if _is_mine(u):
+			_select(u)
+			return
+	_select(null)
+
+
+## Tab : élève suivant qui peut encore agir.
+func _select_next() -> void:
+	if not _can_act():
+		return
+	var mine: Array[Unit] = []
+	for u in state.units:
+		if _is_mine(u):
+			mine.append(u)
+	if mine.is_empty():
+		return
+	var start := mine.find(selected)
+	for i in range(1, mine.size() + 1):
+		var u: Unit = mine[(start + i) % mine.size()]
+		if u.ap > 0 or not u.has_shot:
+			_pick(u)
+			return
+
+
+func _set_hovered(p: PawnView, text: String = "") -> void:
+	if _hovered != null and is_instance_valid(_hovered) and _hovered != p:
+		_hovered.set_hover(false)
+	_hovered = p
+	if p != null:
+		p.set_hover(true, text)
+
+
 func _hover(c: Vector2i) -> void:
+	var target := _visible_unit_at(c)
+	if target != null and target.kind != Unit.Kind.CART:
+		_set_hovered(pawns[target.id], "%s  %d" % [target.name if target.kind == Unit.Kind.STUDENT else _who(target), target.moral])
+	else:
+		_set_hovered(null)
 	if selected == null:
 		_show_cells([])
-		hud.set_hint("")
+		hud.set_hint("Clique sur un de tes élèves" if target == null or not _is_mine(target) else "Clic : choisir %s" % target.name)
 		return
-	var target := state.unit_at(c)
 	if push_cart != null:
 		var path := Movement.path_to(state, push_cart, c)
 		var ok := not path.is_empty() and path.size() <= int(state.data.rules["chariot_cases_max"])
-		_show_cells(path.map(func(p): return [p, Color(1, 0.8, 0.2, 0.6) if ok else Color(1, 0.2, 0.2, 0.5)]))
+		_show_cells(path.map(func(p): return [p, Color(1, 0.8, 0.2, 0.8) if ok else Color(1, 0.2, 0.2, 0.7)]))
 		hud.set_hint("Pousser le chariot ici (%d PA, pas de tir ce tour)" % state.data.ap_cost("pousser_chariot") if ok else "Trop loin pour le chariot (3 cases max)")
+		return
+	if target != null and _is_mine(target) and target != selected:
+		_show_cells([[c, Color(1, 1, 1, 0.7)]])
+		hud.set_hint("Clic : choisir %s" % target.name)
 		return
 	if target != null and target != selected and target.kind != Unit.Kind.CART:
 		var reason := Combat.cannot_shoot_reason(state, selected, target, watering)
 		var traj := Trajectory.cells(selected.pos, target.pos)
-		var color := Color(1, 0.3, 0.2, 0.55) if reason == "" else Color(0.4, 0.4, 0.4, 0.45)
+		var color := Color(1, 0.3, 0.2, 0.85) if reason == "" else Color(0.5, 0.5, 0.5, 0.6)
 		_show_cells(traj.map(func(p): return [p, color]))
 		var dist := Board.distance(selected.pos, target.pos)
 		if reason == "":
-			var what := "Arroser" if watering else "Lancer"
-			hud.set_hint("%s sur %s : distance %d, seuil %d + CX du projectile (%d PA)" % [what, _who(target), dist, dist, state.data.ap_cost("arrosage" if watering else "tir")])
+			var what := "Arroser" if watering else "Lancer sur"
+			hud.set_hint("%s %s : distance %d, à battre %d + CX du projectile (%d PA)" % [what, _who(target), dist, dist, state.data.ap_cost("arrosage" if watering else "tir")])
 		else:
 			hud.set_hint(_reason_text(reason))
 		return
 	if target != null and target.kind == Unit.Kind.CART and Board.adjacent(selected.pos, target.pos):
-		hud.set_hint("Cliquer pour pousser ce chariot")
-		_show_cells([[c, Color(1, 0.8, 0.2, 0.6)]])
+		hud.set_hint("Clic : pousser ce chariot (3 cases max)")
+		_show_cells([[c, Color(1, 0.8, 0.2, 0.8)]])
 		return
 	if Movement.can_climb(state, selected, c):
-		_show_cells([[c, Color(0.6, 0.3, 1, 0.6)]])
+		_show_cells([[c, Color(0.7, 0.4, 1, 0.85)]])
 		hud.set_hint("Monter sur la table : tout le tour, pas de tir")
 		return
 	if Movement.can_descend(state, selected, c):
-		_show_cells([[c, Color(0.6, 0.3, 1, 0.6)]])
+		_show_cells([[c, Color(0.7, 0.4, 1, 0.85)]])
 		hud.set_hint("Descendre de la table : tout le tour")
 		return
 	var reach := Movement.reachable(state, selected)
 	var cells := []
+	var shot_cost := state.data.ap_cost("tir")
 	for k in reach.keys():
 		if k != selected.pos:
-			cells.append([k, Color(0.2, 0.9, 0.4, 0.28)])
+			# Vert : il restera de quoi tirer ; jaune : déplacement seul.
+			var keeps_shot: bool = not selected.has_shot and selected.ap - int(reach[k]) >= shot_cost
+			cells.append([k, Color(0.25, 0.95, 0.4, 0.42) if keeps_shot else Color(1.0, 0.85, 0.2, 0.36)])
 	if reach.has(c) and c != selected.pos:
 		for p in Movement.path_to(state, selected, c):
-			cells.append([p, Color(0.1, 0.7, 1.0, 0.6)])
-		hud.set_hint("Aller ici : %d PA (reste %d)" % [reach[c], selected.ap - reach[c]])
+			cells.append([p, Color(0.1, 0.6, 1.0, 0.95)])
+		hud.set_hint("Aller ici : %d PA (il en restera %d)" % [reach[c], selected.ap - reach[c]])
 	else:
-		hud.set_hint("%d PA restants" % selected.ap)
+		hud.set_hint("%s : %d PA" % [selected.name, selected.ap])
 	_show_cells(cells)
 
 
+# --- Actions du joueur -----------------------------------------------------------
+
 func _click(c: Vector2i) -> void:
-	var target := state.unit_at(c)
-	if _is_mine(target) and target.kind != Unit.Kind.CART:
+	var target := _visible_unit_at(c)
+	if _is_mine(target):
 		_select(target)
 		return
 	if selected == null:
 		return
+	var events := []
 	if push_cart != null:
-		if Movement.push_cart(state, selected, push_cart, c):
-			hud.log_line("%s pousse le %s." % [selected.name, push_cart.name])
+		events = GameActions.push_cart(state, selected, push_cart, c)
 		push_cart = null
-		_refresh_all()
-		return
-	if target != null and target.kind == Unit.Kind.CART and Board.adjacent(selected.pos, target.pos):
+		if events.is_empty():
+			_refresh_all()
+			return
+	elif target != null and target.kind == Unit.Kind.CART and Board.adjacent(selected.pos, target.pos):
 		push_cart = target
 		hud.set_hint("Choisis où pousser le chariot (3 cases max)")
 		return
-	if target != null and target != selected:
-		await _shoot(target)
+	elif target != null and target != selected:
+		var reason := Combat.cannot_shoot_reason(state, selected, target, watering)
+		if reason != "":
+			hud.set_hint(_reason_text(reason))
+			return
+		events = GameActions.shoot(state, selected, target, watering)
+	elif Movement.can_climb(state, selected, c):
+		events = GameActions.climb(state, selected, c)
+	elif Movement.can_descend(state, selected, c):
+		events = GameActions.descend(state, selected, c)
+	else:
+		events = GameActions.move(state, selected, c)
+	if events.is_empty():
 		return
-	if Movement.can_climb(state, selected, c):
-		Movement.climb(state, selected, c)
-		hud.log_line("%s grimpe sur la table !" % selected.name)
-		_refresh_all()
-		return
-	if Movement.can_descend(state, selected, c):
-		Movement.descend(state, selected, c)
-		hud.log_line("%s redescend." % selected.name)
-		_refresh_all()
-		return
-	var from := selected.pos
-	var path := Movement.move(state, selected, c)
-	if not path.is_empty():
-		busy = true
-		_show_cells([])
-		var pawn: PawnView = pawns[selected.id]
-		pawn.position = BoardView.cell_to_world(from)
-		var tw := create_tween()
-		for p in path:
-			tw.tween_property(pawn, "position", BoardView.cell_to_world(p), STEP_TIME)
-		await tw.finished
-		busy = false
-		_refresh_all()
+	await _run(events)
 
 
-func _shoot(target: Unit) -> void:
-	var report := Combat.resolve_shot(state, selected, target, watering)
-	if not report["ok"]:
-		hud.log_line(_reason_text(report["reason"]))
-		return
+## Joue des événements puis rend la main (ou termine la partie).
+func _run(events: Array) -> void:
 	busy = true
 	_show_cells([])
-	var victim := state.get_unit(report["victim_id"]) if report["victim_id"] >= 0 else null
-	await hud.show_shot(report, selected, victim)
-	if victim != null:
-		_bubble(victim, "SPLATCH !" if report["hit"] else "BEURK !")
-		hud.log_line("%s → %s : %d pt (%s)" % [selected.name, _who(victim), report["damage"], report["projectile_name"]])
-		match report.get("neutral_reaction", Combat.NeutralReaction.NONE):
-			Combat.NeutralReaction.RALLIED: hud.log_line("Le neutre rejoint la %s !" % Hud.team_name(selected.team))
-			Combat.NeutralReaction.FLEEING: hud.log_line("Le neutre s'enfuit vers la sortie.")
-			Combat.NeutralReaction.BERSERK: hud.log_line("Le neutre devient BERSERK !")
-	else:
-		hud.log_line("%s rate sa cible, ça tombe par terre." % selected.name)
+	hud.set_hint("")
+	await _play(events)
 	if watering:
 		watering = false
 		hud.set_watering(false)
+	if _check_over():
+		return
 	busy = false
 	_refresh_all()
-	var w := state.winner()
-	if w >= 0:
-		hud.show_banner("%s gagne !" % Hud.team_name(w))
 
 
-func _bubble(u: Unit, text: String) -> void:
-	var l := Label3D.new()
-	l.text = text
-	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	l.no_depth_test = true
-	l.font_size = 72
-	l.outline_size = 18
-	l.modulate = Color("fff35c")
-	l.pixel_size = 0.01
-	l.position = BoardView.cell_to_world(u.pos, 2.6)
-	add_child(l)
-	var tw := create_tween()
-	tw.tween_property(l, "position:y", 3.4, 0.9)
-	tw.parallel().tween_property(l, "modulate:a", 0.0, 0.9).set_delay(0.4)
-	tw.tween_callback(l.queue_free)
+## Victimes que la bande active peut projeter dans un bac ou un chariot.
+func _projection_targets() -> Array:
+	var out := []
+	for v in state.units:
+		if not v.is_on_board() or v.kind == Unit.Kind.CART or v.team == state.current_team or v.status == Unit.Status.CAPTURED:
+			continue
+		var team := GameActions.projection_team(state, state.current_team, v)
+		if not team.is_empty() and SpecialActions.cannot_project_reason(state, team, v) == "":
+			out.append(v)
+	return out
+
+
+func _project() -> void:
+	if not _can_act():
+		return
+	var targets := _projection_targets()
+	if targets.is_empty():
+		hud.set_hint("Projeter : il faut être 3 au contact d'un élève (5 pour un prof, 7 pour le cuisinier), près d'un bac ou d'un chariot.")
+		return
+	var victim: Unit = targets[0]
+	if selected != null:
+		for v in targets:
+			if Board.adjacent(selected.pos, v.pos):
+				victim = v
+	await _run(GameActions.project(state, state.current_team, victim))
 
 
 func _end_turn() -> void:
-	if busy or state.winner() >= 0:
+	if not _can_act():
 		return
+	busy = true
 	_select(null)
-	var next := (state.current_team + 1) % state.team_count
-	if next == 0:
-		state.turn += 1
-	state.start_team_turn(next)
-	hud.log_line("— Tour %d : %s —" % [state.turn, Hud.team_name(next)])
+	await _advance()
+
+
+## Termine le tour de la bande active puis enchaîne jusqu'au prochain joueur humain.
+func _advance() -> void:
+	busy = true
+	while true:
+		var events := TurnFlow.end_team_turn(state)
+		await _play(events)
+		if _check_over():
+			return
+		if opponents.has(state.current_team):
+			await _ai_turn(opponents[state.current_team])
+			if _check_over():
+				return
+			continue
+		break
+	if human_teams.size() > 1:
+		await hud.show_pass_screen(state.current_team)
+	viewer_team = state.current_team if human_teams.has(state.current_team) else viewer_team
+	busy = false
+	_select_first()
+	if selected != null:
+		_focus(pawns[selected.id].global_position)
+
+
+func _ai_turn(bot: Opponent) -> void:
+	_refresh_all()
+	for guard in 200:
+		var events := bot.play_next(state)
+		if events.is_empty():
+			break
+		await _play(events)
+		if state.outcome()["over"]:
+			break
+		await _wait(0.12)
+
+
+func _check_over() -> bool:
+	var o := state.outcome()
+	if not o["over"]:
+		return false
+	over = true
+	busy = true
+	_select(null)
+	_show_game_over(o)
+	return true
+
+
+func _show_game_over(o: Dictionary) -> void:
+	var winner: int = o["winner"]
+	var title := "PERSONNE NE GAGNE"
+	var color := Color("9a9a9a")
+	var won := false
+	if winner >= 0:
+		if GameConfig.solo:
+			won = human_teams.has(winner)
+			title = "VICTOIRE !" if won else "COLLÉ JUSQU'À JUIN !"
+			color = Color("3fb950") if won else BD.RED
+		else:
+			won = true
+			title = BD.team_name(winner).to_upper() + " GAGNE !"
+			color = BD.team_color(winner)
+	var lines := []
+	match o["reason"]:
+		"dernier": lines.append("La %s est la dernière dans la cantine." % BD.team_name(winner).to_lower())
+		"sonnerie": lines.append("La sonnerie a retenti. La bande qui garde le plus de moral l'emporte.")
+		"personne": lines.append("Plus un seul élève dans la cantine : les profs ont gagné.")
+	for t in state.team_count:
+		var st: Dictionary = _stats[t]
+		lines.append("%s : %d élève(s) restant(s), moral %d. Tirs réussis : %d sur %d. Saturés : %d." % [
+			BD.team_name(t), state.students_left(t).size(), state.team_moral(t), st["touches"], st["tirs"], st["satures"]])
+	if GameConfig.solo:
+		lines.append("Difficulté : %s. Appréciation : %s" % [GameSetup.difficulties()[GameConfig.difficulty]["nom"], _appreciation(won)])
+	Sound.ambience(false)
+	if o["reason"] == "sonnerie":
+		Sound.play("sonnerie")
+		await hud.show_banner("DRIIIING !", BD.YELLOW, "Fin du service", 1.2)
+	Sound.play("victoire" if won else "defaite")
+	hud.show_game_over(title, color, lines)
+
+
+func _appreciation(won: bool) -> String:
+	var mine: Dictionary = _stats[human_teams[0]]
+	if won and mine["satures"] >= 3:
+		return "« Élément perturbateur d'une redoutable efficacité. »"
+	if won:
+		return "« A su rester à table plus longtemps que les autres. »"
+	if mine["touches"] >= 10:
+		return "« Vise bien, mais se fait toujours prendre. »"
+	return "« Peut mieux faire. Doit apprendre à courir. »"
+
+
+# --- Mise en scène des événements -----------------------------------------------------
+
+func _play(events: Array) -> void:
+	var i := 0
+	while i < events.size():
+		var e: Dictionary = events[i]
+		if _is_parallel(e):
+			var group := []
+			while i < events.size() and _is_parallel(events[i]):
+				group.append(events[i])
+				i += 1
+			await _play_group(group)
+			continue
+		await _play_one(e)
+		i += 1
 	_refresh_all()
 
 
+func _is_parallel(e: Dictionary) -> bool:
+	return e.get("parallel", false) or (e["type"] == "exit" and e.get("reason", "") == "fuite")
+
+
+## Fuyards : tout le monde court en même temps.
+func _play_group(group: Array) -> void:
+	var longest := 0.0
+	var by_unit := {}
+	for e in group:
+		if not by_unit.has(e["id"]):
+			by_unit[e["id"]] = []
+		by_unit[e["id"]].append(e)
+	for id in by_unit.keys():
+		var seen := false
+		var time := 0.0
+		for e in by_unit[id]:
+			if e["type"] == "move":
+				time += STEP_TIME * e["path"].size()
+				seen = seen or _cell_seen(e["from"]) or _cell_seen(e["path"][-1])
+			else:
+				time += 0.25
+				seen = seen or _cell_seen(e["cell"])
+		if seen:
+			longest = maxf(longest, time)
+			_play_sequence(by_unit[id])
+		else:
+			pawns[id].refresh()
+	if longest > 0.0:
+		await _wait(longest + 0.05)
+
+
+func _play_sequence(seq: Array) -> void:
+	for e in seq:
+		await _play_one(e)
+
+
+func _cell_seen(c: Vector2i) -> bool:
+	return Visibility.can_see(state, viewer_team, c)
+
+
+func _play_one(e: Dictionary) -> void:
+	match e["type"]:
+		"move": await _play_move(e)
+		"shot": await _play_shot(e)
+		"climb", "descend": await _play_climb(e)
+		"push": await _play_push(e)
+		"project": await _play_project(e)
+		"exit": await _play_exit(e)
+		"spawn": await _play_spawn(e)
+		"capture": await _play_capture(e)
+		"plunge": await _play_plunge(e)
+		"cook_wakes": await _play_cook_wakes(e)
+		"neutrals_leave": await _play_neutrals_leave(e)
+		"turn": await _play_turn(e)
+
+
+func _play_move(e: Dictionary) -> void:
+	var pawn: PawnView = pawns[e["id"]]
+	var path: Array = e["path"]
+	var unit: Unit = pawn.unit
+	if not (_cell_seen(e["from"]) or _cell_seen(path[-1])) and unit.team != viewer_team:
+		pawn.refresh()
+		return
+	pawn.visible = true
+	var height := BoardView.TABLE_HEIGHT if unit.on_table else 0.0
+	pawn.position = BoardView.cell_to_world(e["from"], height)
+	if not e.get("parallel", false) and not human_teams.has(unit.team):
+		await _focus(pawn.position)
+	var captives: Array = e.get("captives", [])
+	var tw := create_tween()
+	var prev: Vector2i = e["from"]
+	for p in path:
+		var step := Vector2(p - prev)
+		tw.tween_callback(pawn.set_facing.bind(step))
+		tw.tween_property(pawn, "position", BoardView.cell_to_world(p, height), STEP_TIME)
+		prev = p
+	for cid in captives:
+		if pawns.has(cid):
+			var cp: PawnView = pawns[cid]
+			cp.visible = true
+			var ctw := create_tween()
+			for p in path:
+				ctw.tween_property(cp, "position", BoardView.cell_to_world(p, 0.0) + Vector3(0.45, 0, 0.2), STEP_TIME)
+	await tw.finished
+	if unit.status == Unit.Status.SATURATED or unit.status == Unit.Status.FLEEING:
+		fx.puff(pawn.position, 0.6)
+	_refresh_fog()
+
+
+func _play_climb(e: Dictionary) -> void:
+	var pawn: PawnView = pawns[e["id"]]
+	var up: bool = e["type"] == "climb"
+	var target := BoardView.cell_to_world(e["to"], BoardView.TABLE_HEIGHT if up else 0.0)
+	pawn.look_at_cell(e["to"])
+	var tw := create_tween()
+	tw.tween_property(pawn, "position", target + Vector3(0, 0.5, 0), 0.16).set_ease(Tween.EASE_OUT)
+	tw.tween_property(pawn, "position", target, 0.12).set_ease(Tween.EASE_IN)
+	await tw.finished
+	fx.puff(target, 0.5)
+	if e.get("forced", false):
+		fx.bubble("Ouille !", pawn.head_position(), "cri", 0.9)
+		hud.log_line("%s redescend de la table." % pawn.unit.name)
+	elif up:
+		fx.bubble("Tous aux abris !", pawn.head_position(), "ovale", 1.0)
+		hud.log_line("%s grimpe sur la table !" % pawn.unit.name)
+	_refresh_fog()
+
+
+func _play_push(e: Dictionary) -> void:
+	var cart: PawnView = pawns[e["cart_id"]]
+	var pusher: PawnView = pawns[e["id"]]
+	pusher.look_at_cell(e["from"])
+	pusher.hop(0.2)
+	var tw := create_tween()
+	for p in e["path"]:
+		tw.tween_property(cart, "position", BoardView.cell_to_world(p), 0.14)
+	await tw.finished
+	hud.log_line("%s pousse le %s." % [pusher.unit.name, cart.unit.name])
+
+
+func _play_shot(e: Dictionary) -> void:
+	var r: Dictionary = e["report"]
+	var shooter: Unit = state.get_unit(e["id"])
+	var pawn: PawnView = pawns[shooter.id]
+	var victim: Unit = state.get_unit(r["victim_id"]) if r["victim_id"] >= 0 else null
+	var by_human := human_teams.has(shooter.team)
+	var seen: bool = _cell_seen(e["from"]) or _cell_seen(e["target_cell"])
+	_stats_shot(shooter, r, victim)
+	if not seen:
+		for p in pawns.values():
+			p.refresh()
+		return
+	pawn.visible = true
+	if not by_human:
+		await _focus(BoardView.cell_to_world(e["from"]).lerp(BoardView.cell_to_world(e["target_cell"]), 0.5))
+	var target_unit := state.get_unit(r["target_id"])
+	pawn.set_facing(Vector2(e["target_cell"] - e["from"]))
+	var pace := 1.0 if by_human else 0.7
+	hud.dice.clear()
+	hud.dice.add_text("%s vise %s à %d case%s." % [_who(shooter), _who(target_unit), r["distance"], "s" if r["distance"] > 1 else ""], 22)
+	var key: String = r["projectile"]
+	if r.has("projectile_roll"):
+		var pr: Dictionary = r["projectile_roll"]
+		await hud.dice.roll("Projectile", pr, "= %d : %s (CX %d)" % [pr["total"], r["projectile_name"], r["cx"]], Color.WHITE, 0.4 * pace)
+	else:
+		hud.dice.add_text("Arrosage au robinet (CX 0)", 22)
+	var dex: Dictionary = r["dex_roll"]
+	await hud.dice.roll("Dextérité", dex, "= %d  contre  %d + %d = %d" % [dex["total"], r["distance"], r["cx"], r["threshold"]], BD.RED, 0.45 * pace)
+	hud.dice.stamp("TOUCHÉ !" if r["hit"] else "RATÉ…", Color("2c9a3f") if r["hit"] else Color("8a8a8a"))
+	await _wait(0.12 * pace)
+
+	# Le projectile part en cloche.
+	pawn.hop(0.3)
+	Sound.play("robinet" if r.get("watering", false) else "lancer", -3.0)
+	var from := pawn.body_position()
+	var landing: Vector2i = e["victim_cell"]
+	var dest := BoardView.cell_to_world(landing, 0.1)
+	if victim != null and pawns.has(victim.id):
+		dest = pawns[victim.id].body_position()
+	elif state.board.is_table(landing):
+		dest.y = BoardView.TABLE_HEIGHT
+	await fx.throw_projectile(key, from, dest, clampf(0.28 + 0.035 * float(r["distance"]), 0.3, 0.75))
+	var info := fx.impact_info(key)
+	fx.onomatopoeia(info[0], dest + Vector3(0, 0.9, 0), 1.5 if victim != null else 1.1)
+	Sound.play("splat_sol", 0.0)
+	if not state.board.is_table(landing):
+		fx.floor_stain(info[1], BoardView.cell_to_world(landing), info[2])
+	_shake = 0.12 if victim != null else 0.05
+
+	if victim == null:
+		hud.dice.add_text("La nourriture s'écrase par terre.", 22)
+		hud.log_line("%s rate %s." % [_who(shooter), _who(target_unit)])
+		await _wait(0.35 * pace)
+		return
+	var vp: PawnView = pawns[victim.id]
+	vp.hit_flash()
+	vp.add_stain(GameAssets.texture("effets", str(info[1]) + ".png"), info[2])
+	var dmg: Dictionary = r["damage_roll"]
+	var prefix := "Dégâts" if r["hit"] else "Retombée sur %s" % _who(victim)
+	if dmg["faces"].is_empty():
+		hud.dice.add_text("%s : %d point de moral" % [prefix, dmg["total"]], 22)
+	else:
+		await hud.dice.roll(prefix, dmg, "= %d de moral" % dmg["total"], BD.YELLOW, 0.35 * pace)
+	fx.floating_text("-%d" % r["damage"], vp.head_position(), BD.YELLOW if r["damage"] < 10 else BD.RED, 84 if r["damage"] < 10 else 110)
+	hud.log_line("%s → %s : [b]-%d[/b] (%s)" % [_who(shooter), _who(victim), r["damage"], r["projectile_name"]])
+	vp.refresh()
+	if r.get("saturated", false):
+		Sound.play("beurk")
+		fx.bubble("BEURK !", vp.head_position(), "cri", 1.2, Color("3d8a1e"))
+		hud.dice.add_text("%s est saturé et file vers la sortie !" % _who(victim), 22, BD.RED)
+		hud.log_line("[b]%s est saturé ![/b]" % _who(victim))
+	match r.get("neutral_reaction", Combat.NeutralReaction.NONE):
+		Combat.NeutralReaction.RALLIED:
+			fx.bubble("Je suis avec vous !", vp.head_position(), "ovale", 1.3)
+			hud.log_line("Un neutre rejoint la %s !" % BD.team_name(shooter.team).to_lower())
+		Combat.NeutralReaction.FLEEING:
+			fx.bubble("Au secours !", vp.head_position(), "ovale", 1.0)
+		Combat.NeutralReaction.BERSERK:
+			fx.bubble("#@%&§!!", vp.head_position(), "cri", 1.4, BD.RED)
+			Sound.play("rires", -6.0, 1.3)
+			hud.log_line("[b]Un neutre devient BERSERK ![/b]")
+	await _wait((0.55 if by_human else 0.4) * pace)
+	_refresh_fog()
+
+
+func _stats_shot(shooter: Unit, r: Dictionary, victim: Unit) -> void:
+	if not _stats.has(shooter.team):
+		return
+	_stats[shooter.team]["tirs"] += 1
+	if r["hit"]:
+		_stats[shooter.team]["touches"] += 1
+	if victim != null and r.get("saturated", false):
+		_stats[shooter.team]["satures"] += 1
+
+
+func _play_exit(e: Dictionary) -> void:
+	var pawn: PawnView = pawns[e["id"]]
+	if not _cell_seen(e["cell"]):
+		pawn.refresh()
+		for cid in e.get("captives", []):
+			pawns[cid].refresh()
+		return
+	var names := []
+	for cid in e.get("captives", []):
+		var cu := state.get_unit(cid)
+		names.append(cu.name)
+		var cp: PawnView = pawns[cid]
+		create_tween().tween_property(cp, "scale", Vector3.ONE * 0.01, 0.25)
+	var tw := create_tween()
+	tw.tween_property(pawn, "scale", Vector3.ONE * 0.01, 0.25).set_ease(Tween.EASE_IN)
+	await tw.finished
+	pawn.scale = Vector3.ONE
+	for cid in e.get("captives", []):
+		pawns[cid].scale = Vector3.ONE
+		pawns[cid].refresh()
+	pawn.refresh()
+	if e["reason"] == "prof" and not names.is_empty():
+		fx.bubble("Chez le directeur !", BoardView.cell_to_world(e["cell"], 2.2), "cri", 1.2)
+		hud.log_line("[b]Un prof emmène %s chez le directeur.[/b]" % ", ".join(names))
+		await _wait(0.6)
+	elif pawn.unit.kind == Unit.Kind.STUDENT:
+		hud.log_line("%s quitte la cantine." % pawn.unit.name)
+
+
+func _play_spawn(e: Dictionary) -> void:
+	var u := state.get_unit(e["id"])
+	var pawn := _add_pawn(u)
+	_refresh_fog()
+	hud.dice.clear()
+	await hud.dice.roll("Un prof arrive ! Porte", e["roll"], "= porte %s" % e["door"], Color("6b6b6b"), 0.35)
+	hud.log_line("Un prof entre par la porte %s." % e["door"])
+	if not pawn.shown:
+		return
+	await _focus(pawn.position)
+	Sound.play("sifflet", -4.0)
+	pawn.scale = Vector3.ONE * 0.1
+	var tw := create_tween()
+	tw.tween_property(pawn, "scale", Vector3.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	fx.bubble(["SILENCE !", "ÇA SUFFIT !", "QUI A LANCÉ ÇA ?", "AU PIQUET !"][u.id % 4], pawn.head_position(), "cri", 1.1)
+	await _wait(0.7)
+
+
+func _play_capture(e: Dictionary) -> void:
+	var teacher: PawnView = pawns[e["id"]]
+	var victim: PawnView = pawns[e["victim_id"]]
+	if not _cell_seen(e["cell"]) and victim.unit.team != viewer_team:
+		victim.refresh()
+		return
+	await _focus(teacher.position)
+	teacher.set_facing(Vector2(e["cell"] - teacher.unit.pos))
+	teacher.hop(0.25)
+	Sound.play("sifflet", -6.0, 1.15)
+	hud.dice.clear()
+	hud.dice.add_text("Un prof tente d'attraper %s (1 à %d : pris)." % [_who(victim.unit), state.data.roll_threshold("capture_max")], 22)
+	await hud.dice.roll("Capture", e["roll"], "", Color("6b6b6b"), 0.4)
+	if e["success"]:
+		hud.dice.stamp("ATTRAPÉ PAR L'OREILLE !", BD.RED)
+		fx.bubble("Aïe aïe aïe !", victim.head_position(), "ovale", 1.1)
+		hud.log_line("[b]Un prof attrape %s ![/b]" % _who(victim.unit))
+		_shake = 0.1
+	else:
+		hud.dice.stamp("ESQUIVÉ !", Color("2c9a3f"))
+		fx.bubble("Raté !", victim.head_position(), "ovale", 0.9)
+		victim.hop(0.4)
+	victim.refresh()
+	await _wait(0.75)
+
+
+func _play_plunge(e: Dictionary) -> void:
+	var cook: PawnView = pawns[e["id"]]
+	var victim: PawnView = pawns[e["victim_id"]]
+	if not _cell_seen(e["cell"]) and victim.unit.team != viewer_team:
+		victim.refresh()
+		return
+	await _focus(cook.position)
+	cook.set_facing(Vector2(e["cell"] - cook.unit.pos))
+	hud.dice.clear()
+	hud.dice.add_text("Le cuisinier empoigne %s (1 à %d : plongeon)." % [_who(victim.unit), state.data.roll_threshold("plongeon_max")], 22)
+	await hud.dice.roll("Plongeon", e["roll"], "", Color.WHITE, 0.4)
+	if e["success"]:
+		hud.dice.stamp("DANS LE PLAT DU JOUR !", BD.RED)
+		Sound.play("plongeon")
+		victim.visible = true
+		var tw := create_tween()
+		tw.tween_property(victim, "position:y", 2.2, 0.2).set_ease(Tween.EASE_OUT)
+		tw.tween_property(victim, "scale", Vector3.ONE * 0.05, 0.25)
+		await tw.finished
+		fx.onomatopoeia("bloup", BoardView.cell_to_world(e["cell"], 1.6), 1.8)
+		victim.scale = Vector3.ONE
+		hud.log_line("[b]Le cuisinier plonge %s dans le plat du jour ![/b]" % _who(victim.unit))
+		_shake = 0.15
+	else:
+		hud.dice.stamp("IL GLISSE DES MAINS !", Color("2c9a3f"))
+		victim.hop(0.4)
+	victim.refresh()
+	await _wait(0.75)
+
+
+func _play_project(e: Dictionary) -> void:
+	var victim: PawnView = pawns[e["victim_id"]]
+	for id in e["ids"]:
+		pawns[id].look_at_cell(e["cell"])
+		pawns[id].hop(0.3)
+	hud.dice.clear()
+	hud.dice.add_text("Tous ensemble sur %s (1 à %d : projeté)." % [_who(victim.unit), state.data.roll_threshold("projection_max")], 22)
+	await hud.dice.roll("Projection", e["roll"], "", BD.YELLOW, 0.4)
+	if e["success"]:
+		hud.dice.stamp("ET HOP, DANS LE BAC !", Color("2c9a3f"))
+		Sound.play("plongeon")
+		var tw := create_tween()
+		tw.tween_property(victim, "position:y", 2.4, 0.2).set_ease(Tween.EASE_OUT)
+		tw.tween_property(victim, "scale", Vector3.ONE * 0.05, 0.25)
+		await tw.finished
+		fx.onomatopoeia("bloup", BoardView.cell_to_world(e["cell"], 1.6), 1.8)
+		victim.scale = Vector3.ONE
+		hud.log_line("[b]%s finit dans le bac ![/b]" % _who(victim.unit))
+		_shake = 0.15
+	else:
+		hud.dice.stamp("IL S'ACCROCHE !", Color("8a8a8a"))
+	victim.refresh()
+	await _wait(0.7)
+
+
+func _play_cook_wakes(e: Dictionary) -> void:
+	var cook: PawnView = pawns[e["id"]]
+	hud.log_line("[b]Le cuisinier a vu quelqu'un entrer dans sa cuisine ![/b]")
+	if not cook.shown:
+		return
+	await _focus(cook.position)
+	cook.hop(0.5)
+	_shake = 0.15
+	fx.bubble("MA CUISINE !!!", cook.head_position(), "cri", 1.3, BD.RED)
+	await _wait(0.9)
+
+
+func _play_neutrals_leave(e: Dictionary) -> void:
+	if _tables_stocked:
+		_tables_stocked = false
+		board_view.set_tables_stocked(false)
+	hud.log_line("Les neutres ont fini de manger : ils sortent.")
+	for id in e["ids"]:
+		pawns[id].refresh()
+
+
+func _play_turn(e: Dictionary) -> void:
+	_refresh_all()
+	var team: int = e["team"]
+	if int(e["turn"]) != _last_turn_shown:
+		_last_turn_shown = e["turn"]
+		if not state.tables_have_ammo() and _tables_stocked:
+			_tables_stocked = false
+			board_view.set_tables_stocked(false)
+			Sound.play("sonnerie", -4.0)
+			await hud.show_banner("TABLES VIDES !", BD.RED, "Munitions : bacs et chariots de la cuisine", 1.5)
+		await hud.show_banner("TOUR %d" % e["turn"], BD.YELLOW, BD.team_name(team), 0.7)
+	else:
+		await hud.show_banner(BD.team_name(team).to_upper(), BD.team_color(team).lightened(0.25), "", 0.5)
+	hud.log_line("[b]— Tour %d : %s —[/b]" % [e["turn"], BD.team_name(team)])
+
+
+# --- Rafraîchissement ---------------------------------------------------------------
+
 func _refresh_all() -> void:
-	for p in pawns.values():
-		p.refresh()
-	hud.set_status(state)
+	_refresh_fog()
+	var human_turn := human_teams.has(state.current_team) and not over
+	hud.set_status(state, human_turn)
 	hud.set_unit(selected, state.data.ap_per_turn())
-	hud.set_hint("")
+	var roster: Array = []
+	for u in state.units:
+		if u.team == viewer_team and u.kind != Unit.Kind.CART and (u.kind == Unit.Kind.STUDENT or u.is_on_board()):
+			roster.append(u)
+	hud.set_roster(roster, selected)
+	var can_water := _can_act() and selected != null and state.is_near_tap(selected) and not selected.has_shot
+	hud.set_actions(can_water, _can_act() and not _projection_targets().is_empty(), human_turn and not busy)
+	if not can_water and watering:
+		watering = false
+		hud.set_watering(false)
 	_show_cells([])
 
 
+## Brouillard de guerre : on ne montre que ce que voit la bande du joueur.
+func _refresh_fog() -> void:
+	board_view.set_fog(Visibility.hidden_cells(state, viewer_team))
+	for id in pawns.keys():
+		var p: PawnView = pawns[id]
+		p.shown = Visibility.unit_visible(state, viewer_team, p.unit)
+		p.refresh()
+
+
 func _who(u: Unit) -> String:
-	return "un neutre" if u.kind == Unit.Kind.NEUTRAL and not u.rallied else u.name
+	if u == null:
+		return "?"
+	match u.kind:
+		Unit.Kind.NEUTRAL:
+			if u.status == Unit.Status.BERSERK:
+				return "le berserk"
+			return "un neutre rallié" if u.rallied else "un neutre"
+		Unit.Kind.TEACHER: return "le prof"
+		Unit.Kind.COOK: return "le cuisinier"
+	# Les deux bandes ont les mêmes six élèves : on précise la couleur.
+	return "%s (%s)" % [u.name, BD.TEAM_NAMES[u.team % BD.TEAM_NAMES.size()]] if u.team >= 0 else u.name
 
 
 func _reason_text(reason: String) -> String:
 	match reason:
 		"deja_tire": return "Déjà tiré ce tour."
-		"pas_assez_de_pa": return "Pas assez de PA."
-		"pas_de_munitions": return "Pas de munition : va au contact d'une table (tours 1 à 4), d'un bac ou d'un chariot."
+		"pas_assez_de_pa": return "Pas assez de PA pour tirer (4)."
+		"pas_de_munitions": return "Pas de munition : va au contact d'une table garnie, d'un bac ou d'un chariot."
 		"mur": return "Un mur bloque la trajectoire."
 		"trop_loin": return "Trop loin pour arroser (5 cases max)."
 		"pas_de_robinet": return "Il faut être au contact d'un robinet pour arroser."

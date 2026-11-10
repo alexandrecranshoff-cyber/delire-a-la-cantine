@@ -27,6 +27,7 @@ const DIRECTIONS: Array[Vector2i] = [
 var width := 0
 var height := 0
 var _cells := PackedInt32Array()
+var _wall_sums := PackedInt32Array()  # sommes cumulées des murs, pour walls_in_rect
 
 
 static func from_ascii(rows: Array) -> Board:
@@ -91,6 +92,29 @@ func blocks_shot(c: Vector2i) -> bool:
 ## Obstacle pour le passage en diagonale entre deux cases.
 func is_obstacle(c: Vector2i) -> bool:
 	return not is_ground(c)
+
+
+## Nombre de murs dans le rectangle englobant deux cases (réponse immédiate grâce aux sommes cumulées).
+## Sert à écarter d'emblée les lignes de tir qui ne peuvent croiser aucun mur.
+func walls_in_rect(a: Vector2i, b: Vector2i) -> int:
+	if _wall_sums.is_empty():
+		_build_wall_sums()
+	var x0 := clampi(mini(a.x, b.x), 0, width - 1)
+	var x1 := clampi(maxi(a.x, b.x), 0, width - 1) + 1
+	var y0 := clampi(mini(a.y, b.y), 0, height - 1)
+	var y1 := clampi(maxi(a.y, b.y), 0, height - 1) + 1
+	var w := width + 1
+	return _wall_sums[y1 * w + x1] - _wall_sums[y0 * w + x1] - _wall_sums[y1 * w + x0] + _wall_sums[y0 * w + x0]
+
+
+func _build_wall_sums() -> void:
+	var w := width + 1
+	_wall_sums.resize(w * (height + 1))
+	_wall_sums.fill(0)
+	for y in height:
+		for x in width:
+			var wall := 1 if _cells[y * width + x] == Terrain.WALL else 0
+			_wall_sums[(y + 1) * w + x + 1] = wall + _wall_sums[y * w + x + 1] + _wall_sums[(y + 1) * w + x] - _wall_sums[y * w + x]
 
 
 func cells_of(kind: Terrain) -> Array[Vector2i]:

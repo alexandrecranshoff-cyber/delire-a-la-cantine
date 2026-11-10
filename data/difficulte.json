@@ -1,0 +1,28 @@
+{
+  "_note": "Trois niveaux pour le solo. ia : réglages de l'adversaire (scripts/ai/opponent.gd). prof_periode : un prof entre tous les N tours de bande (livret : 1). moral_joueur_pct / moral_ia_pct : moral de départ en pourcentage de la fiche. Valeurs réglées par parties simulées (tools/simuler_parties.gd).",
+  "ordre": ["facile", "normal", "difficile"],
+  "facile": {
+    "nom": "Récré",
+    "resume": "Adversaires étourdis, profs rares. Pour découvrir.",
+    "prof_periode": 3,
+    "moral_joueur_pct": 125,
+    "moral_ia_pct": 100,
+    "ia": {"bruit": 9.0, "distraction": 0.3, "poids_prof": 0.0, "poids_neutre": 0.6, "poids_munitions": 0.4, "tir_minimum": 0.0, "concentration": 0.0, "prudence_cuisine": 0.0}
+  },
+  "normal": {
+    "nom": "Cantine",
+    "resume": "La partie du livret : adversaires corrects, profs réguliers.",
+    "prof_periode": 2,
+    "moral_joueur_pct": 100,
+    "moral_ia_pct": 100,
+    "ia": {"bruit": 3.0, "distraction": 0.08, "poids_prof": 1.0, "poids_neutre": 0.15, "poids_munitions": 1.0, "tir_minimum": 0.6, "concentration": 0.5, "prudence_cuisine": 0.5}
+  },
+  "difficile": {
+    "nom": "Conseil de discipline",
+    "resume": "Adversaires malins et rancuniers, un prof à chaque tour.",
+    "prof_periode": 1,
+    "moral_joueur_pct": 100,
+    "moral_ia_pct": 120,
+    "ia": {"bruit": 0.5, "distraction": 0.0, "poids_prof": 2.0, "poids_neutre": 0.05, "poids_munitions": 1.5, "tir_minimum": 1.0, "concentration": 1.0, "prudence_cuisine": 1.0}
+  }
+}
