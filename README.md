@@ -22,7 +22,7 @@ Puis ouvrir le dossier dans Godot (Importer > `project.godot`).
 
 Ouvrir le projet dans Godot et lancer la scène principale (F5), ou prendre une des deux versions construites à chaque fusion sur `main` (onglet Actions, workflow « Versions du jeu ») :
 
-- **Version web** : textures allégées (`assets/sd`), environ 19 Mo de données, publiée aussi sur GitHub Pages.
+- **Version web** : textures allégées (`assets/sd`), environ 19 Mo de données, mise en ligne sur https://www.iomino.fr/cantine/ par le workflow « Mise en ligne sur iomino.fr ».
 - **Version PC** (Windows et Linux) : textures deux fois plus fines (`assets/hd`), anticrénelage 4x, musique en meilleure qualité.
 
 Le menu propose le solo contre l'ordinateur (trois difficultés : Récré, Cantine, Conseil de discipline) ou deux joueurs sur le même écran.

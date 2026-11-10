@@ -1,6 +1,7 @@
 name: Versions du jeu
 
-# Exporte la version web (publiée sur GitHub Pages) et la version PC (Windows, Linux) à chaque fusion sur main.
+# Exporte la version web et la version PC (Windows, Linux) à chaque fusion sur main.
+# La version web est ensuite envoyée sur iomino.fr par le workflow « Mise en ligne sur iomino.fr ».
 on:
   push:
     branches: [main]
@@ -8,11 +9,9 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: versions
   cancel-in-progress: true
 
 jobs:
@@ -53,16 +52,3 @@ jobs:
         with:
           name: jeu-web
           path: build/web
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: build/web
-
-  deploy:
-    needs: export
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
