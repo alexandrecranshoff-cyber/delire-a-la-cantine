@@ -12,14 +12,22 @@ static func start_game(state: GameState) -> void:
 ## Si la partie continue, la bande suivante commence son tour (state.current_team).
 static func end_team_turn(state: GameState) -> Array:
 	state.team_turns_done += 1
-	var events := AutoPawns.run(state)
-	if state.outcome()["over"]:
-		return events
 	var next := state.current_team
 	for i in state.team_count:
 		next = (next + 1) % state.team_count
 		if not state.students_left(next).is_empty():
 			break
+	# Adaptation vidéo : profs et cuisinier n'agissent qu'en fin de manche, pour que chaque bande
+	# ait un tour pour réagir (livret : après chaque joueur).
+	var adults := next <= state.current_team or int(state.data.rules.get("adultes_par_manche", 0)) == 0
+	var events := AutoPawns.run(state, adults)
+	if state.outcome()["over"]:
+		return events
+	if state.students_left(next).is_empty():
+		for i in state.team_count:
+			next = (next + 1) % state.team_count
+			if not state.students_left(next).is_empty():
+				break
 	if next <= state.current_team:
 		state.turn += 1
 	if state.outcome()["over"]:

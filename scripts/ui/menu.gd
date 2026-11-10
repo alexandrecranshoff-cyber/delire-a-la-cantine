@@ -126,6 +126,7 @@ func _set_mode(solo: bool) -> void:
 	GameConfig.solo = solo
 	for k in _mode_buttons.keys():
 		_mode_buttons[k].set_pressed_no_signal(k == solo)
+		_mode_buttons[k].modulate = Color.WHITE if k == solo else Color(0.8, 0.8, 0.8, 0.85)
 	_difficulty_box.modulate = Color.WHITE if solo else Color(1, 1, 1, 0.35)
 	_set_difficulty(GameConfig.difficulty)
 

@@ -32,7 +32,7 @@ var _overlay := MultiMeshInstance3D.new()
 var _overlay_mesh := MultiMesh.new()
 var _cam_target := Vector3.ZERO
 var _cam_angle := 45.0
-var _cam_zoom := 29.0
+var _cam_zoom := 24.0
 var _panning := false
 var _rotating := false
 var _rotate_tween: Tween
@@ -40,6 +40,7 @@ var _cam_goal := 45.0
 var _hovered: PawnView
 var _shake := 0.0
 var _stats := {}
+var hud_auto := false
 var _last_turn_shown := 0
 var _tables_stocked := true
 
@@ -52,13 +53,17 @@ func _ready() -> void:
 	state = GameSetup.new_game(level, data, s, GameConfig.players, ai, GameConfig.difficulty if GameConfig.solo else "")
 	if not GameConfig.solo:
 		state.options["prof_periode"] = int(GameSetup.difficulties()["normal"]["prof_periode"])
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("tours="):
+			state.options["tours_max"] = int(a.split("=")[1])  # essais : partie courte
+	hud_auto = OS.get_cmdline_user_args().has("auto")
 	for t in state.team_count:
 		if state.ai_teams.has(t):
 			var profile: Dictionary = GameSetup.difficulties()[GameConfig.difficulty]["ia"]
 			opponents[t] = Opponent.new(t, profile, s + 77 * (t + 1))
 		else:
 			human_teams.append(t)
-		_stats[t] = {"tirs": 0, "touches": 0, "satures": 0}
+		_stats[t] = {"tirs": 0, "touches": 0, "satures": 0, "emmenes": 0, "plonges": 0}
 	viewer_team = human_teams[0] if not human_teams.is_empty() else 0
 
 	_setup_environment()
@@ -72,6 +77,7 @@ func _ready() -> void:
 	_setup_overlay()
 
 	hud = Hud.new()
+	hud.auto_pass = hud_auto
 	add_child(hud)
 	hud.end_turn_pressed.connect(_end_turn)
 	hud.watering_toggled.connect(func(on): watering = on)
@@ -102,6 +108,8 @@ func _intro() -> void:
 		await hud.show_pass_screen(state.current_team)
 	busy = false
 	_select_first()
+	if selected != null:
+		_focus(pawns[selected.id].global_position)
 	for a in OS.get_cmdline_user_args():
 		if a == "rapide":
 			_set_fast(true)
@@ -116,11 +124,14 @@ func _intro() -> void:
 
 ## Démonstration et essais : l'ordinateur joue aussi la bande du joueur, en passant par l'interface.
 func _autoplay() -> void:
-	var bot := Opponent.new(human_teams[0], GameSetup.difficulties()["normal"]["ia"], 4242)
+	var bots := {}
+	for t in human_teams:
+		bots[t] = Opponent.new(t, GameSetup.difficulties()["normal"]["ia"], 4242 + t)
 	while not over:
 		if not _can_act():
 			await _wait(0.2)
 			continue
+		var bot: Opponent = bots[state.current_team]
 		var events := bot.play_next(state)
 		if events.is_empty():
 			await _end_turn()
@@ -385,6 +396,9 @@ func _focus(world: Vector3, force: bool = false) -> void:
 	# Le bas de l'écran est pris par l'interface : on vise un peu plus bas que le point à montrer.
 	var toward := Vector3(sin(deg_to_rad(_cam_angle)), 0, cos(deg_to_rad(_cam_angle)))
 	var goal := Vector3(world.x, 0, world.z) + toward * _cam_zoom * 0.1
+	# On garde la cible dans le plateau pour ne pas montrer surtout du vide.
+	goal.x = clampf(goal.x, 8.0, state.board.width - 9.0)
+	goal.z = clampf(goal.z, 8.0, state.board.height - 9.0)
 	var tw := create_tween()
 	tw.tween_method(func(v: Vector3):
 		_cam_target = v
@@ -667,23 +681,31 @@ func _show_game_over(o: Dictionary) -> void:
 			won = true
 			title = BD.team_name(winner).to_upper() + " GAGNE !"
 			color = BD.team_color(winner)
-	var lines := []
+	var intro := ""
 	match o["reason"]:
-		"dernier": lines.append("La %s est la dernière dans la cantine." % BD.team_name(winner).to_lower())
-		"sonnerie": lines.append("La sonnerie a retenti. La bande qui garde le plus de moral l'emporte.")
-		"personne": lines.append("Plus un seul élève dans la cantine : les profs ont gagné.")
+		"dernier": intro = "La %s est la dernière dans la cantine." % BD.team_name(winner).to_lower()
+		"sonnerie": intro = "La sonnerie a retenti. La bande qui garde le plus de moral l'emporte." if winner >= 0 else "La sonnerie a retenti sur une égalité parfaite."
+		"personne": intro = "Plus un seul élève dans la cantine : les profs ont gagné."
+	var teams := []
+	var rows := [["Élèves encore à table"], ["Moral restant"], ["Tirs réussis"], ["Adversaires saturés"], ["Emmenés par un prof"], ["Plongés dans le plat du jour"]]
 	for t in state.team_count:
 		var st: Dictionary = _stats[t]
-		lines.append("%s : %d élève(s) restant(s), moral %d. Tirs réussis : %d sur %d. Saturés : %d." % [
-			BD.team_name(t), state.students_left(t).size(), state.team_moral(t), st["touches"], st["tirs"], st["satures"]])
+		teams.append(t)
+		rows[0].append(str(state.students_left(t).size()))
+		rows[1].append(str(state.team_moral(t)))
+		rows[2].append("%d sur %d" % [st["touches"], st["tirs"]])
+		rows[3].append(str(st["satures"]))
+		rows[4].append(str(st["emmenes"]))
+		rows[5].append(str(st["plonges"]))
+	var comment := ""
 	if GameConfig.solo:
-		lines.append("Difficulté : %s. Appréciation : %s" % [GameSetup.difficulties()[GameConfig.difficulty]["nom"], _appreciation(won)])
+		comment = "Difficulté « %s ». Appréciation : %s" % [GameSetup.difficulties()[GameConfig.difficulty]["nom"], _appreciation(won)]
 	Sound.ambience(false)
 	if o["reason"] == "sonnerie":
 		Sound.play("sonnerie")
 		await hud.show_banner("DRIIIING !", BD.YELLOW, "Fin du service", 1.2)
 	Sound.play("victoire" if won else "defaite")
-	hud.show_game_over(title, color, lines)
+	hud.show_game_over(title, color, intro, teams, rows, comment)
 
 
 func _appreciation(won: bool) -> String:
@@ -756,6 +778,7 @@ func _cell_seen(c: Vector2i) -> bool:
 
 
 func _play_one(e: Dictionary) -> void:
+	_count_exits(e)
 	match e["type"]:
 		"move": await _play_move(e)
 		"shot": await _play_shot(e)
@@ -769,6 +792,22 @@ func _play_one(e: Dictionary) -> void:
 		"cook_wakes": await _play_cook_wakes(e)
 		"neutrals_leave": await _play_neutrals_leave(e)
 		"turn": await _play_turn(e)
+
+
+## Pour le bulletin de fin : élèves emmenés par un prof ou plongés par le cuisinier.
+func _count_exits(e: Dictionary) -> void:
+	var victims := []
+	var key := ""
+	if e["type"] == "exit" and e.get("reason", "") == "prof":
+		victims = e.get("captives", [])
+		key = "emmenes"
+	elif e["type"] == "plunge" and e["success"]:
+		victims = [e["victim_id"]]
+		key = "plonges"
+	for id in victims:
+		var v := state.get_unit(id)
+		if v != null and v.kind == Unit.Kind.STUDENT and _stats.has(v.team):
+			_stats[v.team][key] += 1
 
 
 func _play_move(e: Dictionary) -> void:

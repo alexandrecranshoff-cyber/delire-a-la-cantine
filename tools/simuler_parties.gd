@@ -34,14 +34,23 @@ func _init() -> void:
 						stats["tirs"] += 1
 						if e["report"]["hit"]: stats["touches"] += 1
 					"capture":
-						if e["success"]: stats["captures"] += 1
+						if e["success"]:
+							stats["captures"] += 1
+							var k := "captures_bande_%d" % state.get_unit(e["victim_id"]).team
+							stats[k] = stats.get(k, 0) + 1
 					"plunge":
-						if e["success"]: stats["plongeons"] += 1
+						if e["success"]:
+							stats["plongeons"] += 1
+							var k := "plongeons_bande_%d" % state.get_unit(e["victim_id"]).team
+							stats[k] = stats.get(k, 0) + 1
 					"spawn": stats["profs"] += 1
 		for u in state.units:
 			if u.kind == Unit.Kind.STUDENT and u.team != Unit.NO_TEAM:
 				var k := "eleves_restants" if u.status in [Unit.Status.ACTIVE, Unit.Status.CAPTURED] else ("eleves_satures" if u.moral <= 0 else "eleves_emmenes_ou_plonges")
 				stats[k] = stats.get(k, 0) + 1
+				if u.kind == Unit.Kind.STUDENT and u.moral <= 0:
+					var k2 := "satures_bande_%d" % u.team
+					stats[k2] = stats.get(k2, 0) + 1
 		var o := state.outcome()
 		wins[2 if o["winner"] < 0 else o["winner"]] += 1
 		reasons[o["reason"]] = reasons.get(o["reason"], 0) + 1

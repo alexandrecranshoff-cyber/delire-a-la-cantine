@@ -39,6 +39,29 @@ var _help: Control
 var _score_label: Label
 
 
+## Flèche tournante dessinée (les polices du jeu n'ont pas ce signe, surtout dans le navigateur).
+class RotateIcon:
+	extends Control
+	var direction := 1
+
+	func _draw() -> void:
+		# Dessinée pour la droite, retournée en miroir pour la gauche.
+		if direction < 0:
+			draw_set_transform(Vector2(size.x, 0), 0.0, Vector2(-1, 1))
+		var c := size / 2.0
+		var r := minf(size.x, size.y) * 0.26
+		var from := deg_to_rad(-200.0)
+		var to := deg_to_rad(35.0)
+		draw_arc(c, r, from, to, 20, Color.WHITE, 3.5, true)
+		var tip := c + Vector2(cos(to), sin(to)) * r
+		var along := Vector2(-sin(to), cos(to))
+		var out := Vector2(cos(to), sin(to))
+		draw_colored_polygon([tip + along * 8.0, tip - out * 6.5 - along * 1.5, tip + out * 6.5 - along * 1.5], Color.WHITE)
+
+
+var auto_pass := false  ## essais automatiques : l'écran « passe la main » se ferme seul
+
+
 func _ready() -> void:
 	_root = Control.new()
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -222,9 +245,14 @@ func _build_bottom() -> void:
 	_project_button.tooltip_text = "À trois autour d'un ennemi, près d'un bac ou d'un chariot : dans le plat du jour ! (P)"
 	_project_button.pressed.connect(func(): project_pressed.emit())
 	buttons.add_child(_project_button)
-	for spec in [["⟲", -1, "Tourner la vue à gauche (Q)"], ["⟳", 1, "Tourner la vue à droite (E)"]]:
-		var rot := BD.sticker(spec[0], Color("6b6b6b"), 22)
-		rot.add_theme_font_override("font", ThemeDB.fallback_font)
+	for spec in [["gauche", -1, "Tourner la vue à gauche (Q)"], ["droite", 1, "Tourner la vue à droite (E)"]]:
+		var rot := BD.sticker("", Color("6b6b6b"), 22)
+		rot.custom_minimum_size = Vector2(48, 0)
+		var icon := RotateIcon.new()
+		icon.direction = spec[1]
+		icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rot.add_child(icon)
 		rot.tooltip_text = spec[2]
 		rot.pressed.connect(func(): rotate_pressed.emit(spec[1]))
 		buttons.add_child(rot)
@@ -274,8 +302,8 @@ func _build_help() -> void:
 		"Pour toucher, les dés de dextérité doivent atteindre la distance + la difficulté (CX) du projectile. Plus tu es près, mieux c'est.",
 		"Munitions : au contact d'une table (tours 1 à 4), puis seulement des bacs et des chariots de la cuisine. On garde une munition en poche.",
 		"Moral à zéro : l'élève est saturé et file vers la sortie. Un tir raté retombe sur un voisin.",
-		"Les profs entrent par une porte tirée au dé et attrapent l'élève le plus proche. Sature-les (30 de moral) pour libérer leur prise.",
-		"Le cuisinier défend sa cuisine : il tire et plonge les imprudents dans le plat du jour.",
+		"Les profs entrent par une porte tirée au dé. À la fin de chaque tour complet, ils avancent de 4 cases vers l'élève le plus proche et l'attrapent au contact : tiens-toi à plus de 5 cases, ou sature-les (30 de moral).",
+		"Le cuisinier défend sa cuisine, lui aussi en fin de tour : il tire et plonge les imprudents dans le plat du jour.",
 		"Neutre touché : sur 1 il te rejoint, sur 6 il devient berserk, sinon il s'enfuit.",
 		"Clic sur une table au contact pour grimper dessus (tout le tour). Clic sur un chariot au contact pour le pousser de 3 cases.",
 		"Caméra : clic droit pour tourner, Q et E par crans, molette pour zoomer, flèches ou clic molette pour se déplacer.",
@@ -545,12 +573,15 @@ func show_pass_screen(team: int) -> void:
 	var go := BD.sticker("C'EST MOI !", BD.team_color(team), 48)
 	go.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	col.add_child(go)
-	await go.pressed
+	if auto_pass:
+		await get_tree().create_timer(2.5).timeout
+	else:
+		await go.pressed
 	bg.queue_free()
 
 
 ## Bulletin de fin de partie.
-func show_game_over(title: String, color: Color, lines: Array) -> void:
+func show_game_over(title: String, color: Color, intro: String, teams: Array, rows: Array, comment: String) -> void:
 	var bg := _dim_overlay()
 	var sheet := BD.paper_panel(30)
 	sheet.set_anchors_preset(Control.PRESET_CENTER)
@@ -565,11 +596,33 @@ func show_game_over(title: String, color: Color, lines: Array) -> void:
 	var t := BD.label(title, 84, color, true)
 	BD.outline(t, 14)
 	col.add_child(t)
-	for line in lines:
-		var l := BD.label(str(line), 30)
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		l.custom_minimum_size = Vector2(820, 0)
-		col.add_child(l)
+	var first := BD.label(intro, 30)
+	first.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	first.custom_minimum_size = Vector2(820, 0)
+	col.add_child(first)
+	# Le tableau du bulletin : une colonne par bande.
+	var grid := GridContainer.new()
+	grid.columns = teams.size() + 1
+	grid.add_theme_constant_override("h_separation", 36)
+	grid.add_theme_constant_override("v_separation", 2)
+	grid.add_child(Control.new())
+	for team in teams:
+		var head := BD.label(BD.team_name(team), 34, BD.team_color(team), true)
+		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		head.custom_minimum_size = Vector2(170, 0)
+		grid.add_child(head)
+	for r in rows:
+		for i in r.size():
+			var cell := BD.label(str(r[i]), 28 if i == 0 else 32, BD.INK, i > 0)
+			if i > 0:
+				cell.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			grid.add_child(cell)
+	col.add_child(grid)
+	if comment != "":
+		var note := BD.label(comment, 28, Color("b3261e"))
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		note.custom_minimum_size = Vector2(820, 0)
+		col.add_child(note)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 20)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER

@@ -5,15 +5,18 @@ extends RefCounted
 ## Chaque fonction modifie l'état et ajoute les événements à afficher.
 
 
-static func run(state: GameState) -> Array:
+## `adults` : les profs et le cuisinier agissent aussi (voir `adultes_par_manche` dans regles_video.json).
+static func run(state: GameState, adults: bool = true) -> Array:
 	var events := []
 	_leave_tables(state, events)
 	_neutrals_leave(state, events)
 	_runaways(state, events)
 	_berserks(state, events)
-	_teachers(state, events)
+	if adults:
+		_teachers(state, events)
 	_spawn_teacher(state, events)
-	_cook(state, events)
+	if adults:
+		_cook(state, events)
 	return events
 
 
