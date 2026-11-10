@@ -1,0 +1,15 @@
+{
+  "_note": "Table 2 du livret. Clé = total de 2 dés (2D6). degats : nombre de D6, 'demi' = 1/2 D (1-2=1, 3-4=2, 5-6=3), 'fixe' = points fixes.",
+  "2":  {"nom": "verre d'eau",               "degats": {"fixe": 1}, "cx": 1},
+  "3":  {"nom": "hareng à l'huile",          "degats": {"d6": 2},   "cx": 2},
+  "4":  {"nom": "macédoine de légumes",      "degats": {"d6": 1},   "cx": 0},
+  "5":  {"nom": "crème caramel",             "degats": {"demi": 1}, "cx": 1},
+  "6":  {"nom": "fromage blanc",             "degats": {"demi": 1}, "cx": 2},
+  "7":  {"nom": "rillettes",                 "degats": {"d6": 1},   "cx": 0},
+  "8":  {"nom": "tripes à la mode de Caen",  "degats": {"d6": 4},   "cx": 3},
+  "9":  {"nom": "camembert gluant",          "degats": {"d6": 1},   "cx": 0},
+  "10": {"nom": "spaghetti sauce tomate",    "degats": {"d6": 2},   "cx": 3},
+  "11": {"nom": "yaourt",                    "degats": {"d6": 1},   "cx": 0},
+  "12": {"nom": "purée St-Germain",          "degats": {"d6": 3},   "cx": 2},
+  "robinet": {"nom": "arrosant (robinet)", "degats": {"d6": 1}, "cx": 0, "portee_max": 5}
+}
