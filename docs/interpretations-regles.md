@@ -15,3 +15,5 @@ Points où le livret laisse un doute, et le choix fait dans le moteur (`scripts/
 | Monter, descendre d'une table | Il faut avoir encore tous ses PA ; l'action les consomme et interdit le tir. | Game design (12 PA) |
 | Victoire | Comptent les élèves actifs ou capturés (un capturé peut être libéré). Saturés, plongés et neutres ralliés ne comptent pas. | « but du jeu » |
 | Projection | Victime au contact ou à une case d'un bac ou d'un chariot (distance 2 au plus). Neutre : comme un élève (3). | Paragraphe « projeter » |
+| Plan du niveau 1 | Relevé sur les 4 morceaux du plateau (pages 4 à 7) : salle de 30 × 27 cases, 8 tables de 10 × 3, cuisine de 7 rangées, 2 ouvertures de 5 cases, portes 1 à 6 de 2 cases. Chaque table a 8 places, 24 cases N. Les chariots occupent une seule case. | `tools/generer_niveau_1.py` |
+| Élèves des tables libres | À 2 ou 3 joueurs, ils deviennent des neutres, assis à leurs tables. | « mise en place » |

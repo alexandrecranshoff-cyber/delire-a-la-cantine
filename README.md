@@ -18,6 +18,14 @@ git lfs pull
 
 Puis ouvrir le dossier dans Godot (Importer > `project.godot`).
 
+## Jouer (maquette)
+
+Ouvrir le projet dans Godot et lancer la scène principale (F5), ou ouvrir la version web publiée à chaque fusion sur `main` (onglet Actions, workflow « Version web »).
+
+- Clic gauche : choisir un élève de sa bande, puis une case (déplacement), une table au contact (monter), ou un pion (tir).
+- R : basculer en arrosage (au contact d'un robinet). Clic sur un chariot au contact, puis une case : le pousser.
+- Entrée : fin du tour. Clic droit ou molette enfoncée : déplacer la vue ; molette : zoom ; Q et E : tourner.
+
 ## Tests
 
 Le moteur de règles (`scripts/rules/`) est testé sans affichage :

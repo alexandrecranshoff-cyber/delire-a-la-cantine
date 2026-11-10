@@ -8,6 +8,7 @@ var dice: DiceRoller
 var units: Array[Unit] = []
 var turn := 1
 var current_team := 0
+var team_count := 2
 
 var _next_id := 1
 
