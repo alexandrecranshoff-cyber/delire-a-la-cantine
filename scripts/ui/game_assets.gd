@@ -56,7 +56,12 @@ static func texture(family: String, name: String) -> Texture2D:
 static func sound(name: String) -> AudioStream:
 	var p := "res://assets/audio/sfx/%s.wav" % name
 	if not _cache.has(p):
-		_cache[p] = load(p) if ResourceLoader.exists(p) else null
+		var s: AudioStream = load(p) if ResourceLoader.exists(p) else null
+		# Un son vide fait planter la lecture audio du navigateur : on l'ignore.
+		if s != null and s.get_length() <= 0.01:
+			push_warning("Bruitage vide ignoré : " + p)
+			s = null
+		_cache[p] = s
 	return _cache[p]
 
 
