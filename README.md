@@ -18,7 +18,19 @@ git lfs pull
 
 Puis ouvrir le dossier dans Godot (Importer > `project.godot`).
 
+## Tests
+
+Le moteur de règles (`scripts/rules/`) est testé sans affichage :
+
+```bash
+godot --headless --path . --import
+godot --headless --path . -s tests/run_tests.gd
+```
+
+Les tests tournent aussi sur GitHub à chaque PR.
+
 ## Documentation
 
 - [Règles du prototype](docs/regles-originales.md)
+- [Interprétations des règles](docs/interpretations-regles.md)
 - Données de jeu : [`data/`](data/)

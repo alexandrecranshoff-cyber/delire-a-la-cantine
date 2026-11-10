@@ -1,0 +1,24 @@
+{
+  "_note": "Adaptation jeu vidéo (game design) : points d'action façon UFO et seuils des jets du livret. Valeurs à régler en jouant.",
+  "points_action": {
+    "par_tour": 12,
+    "deplacement": 1,
+    "tir": 4,
+    "arrosage": 4,
+    "pousser_chariot": 4,
+    "projection": 4
+  },
+  "chariot_cases_max": 3,
+  "tours_munitions_tables": 4,
+  "tours_max_sur_table": 2,
+  "distance_max_bac": 2,
+  "jets": {
+    "capture_max": 4,
+    "double_capture_max": 2,
+    "projection_max": 4,
+    "plongeon_max": 4,
+    "neutre_rallie_max": 1,
+    "neutre_berserk_min": 6
+  },
+  "projection_eleves_requis": {"eleve": 3, "neutre": 3, "prof": 5, "cuisinier": 7}
+}
