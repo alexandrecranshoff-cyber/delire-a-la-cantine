@@ -1,0 +1,18 @@
+{
+  "_note": "Table 1 du livret (fiche de jeu) + potentiels de déplacement. dexterite : nombre de D6 + bonus fixe.",
+  "eleves": {
+    "Bigleux":    {"dexterite": {"d6": 1, "bonus": 1}, "moral": 30},
+    "Grobill":    {"dexterite": {"d6": 3, "bonus": 0}, "moral": 90},
+    "Zieuglôque": {"dexterite": {"d6": 2, "bonus": 0}, "moral": 50},
+    "Ledur":      {"dexterite": {"d6": 2, "bonus": 0}, "moral": 50},
+    "Dudugenoux": {"dexterite": {"d6": 4, "bonus": 0}, "moral": 100},
+    "Delamensa":  {"dexterite": {"d6": 1, "bonus": 3}, "moral": 35}
+  },
+  "autres": {
+    "cuisinier": {"dexterite": {"d6": 4, "bonus": 0}, "moral": 90},
+    "neutre":    {"dexterite": {"d6": 2, "bonus": 0}, "moral": 10},
+    "prof":      {"dexterite": {"d6": 0, "bonus": 0}, "moral": 30}
+  },
+  "deplacement": {"eleve": 8, "prof": 4, "cuisinier": 3, "neutre": 3, "chariot": 3},
+  "effectifs": {"equipes": 4, "eleves_par_equipe": 6, "neutres": 24, "profs": 10, "cuisinier": 1, "chariots": 2, "bacs": 3}
+}

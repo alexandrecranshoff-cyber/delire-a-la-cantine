@@ -1,0 +1,20 @@
+; Engine configuration file.
+; Projet Godot 4.6 : Délire à la cantine
+
+config_version=5
+
+[application]
+
+config/name="Délire à la cantine"
+config/description="Jeu de stratégie au tour par tour dans une cantine qui part en vrille."
+config/features=PackedStringArray("4.6", "Forward Plus")
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/stretch/mode="canvas_items"
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
