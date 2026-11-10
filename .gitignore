@@ -13,3 +13,4 @@ export_credentials.cfg
 Thumbs.db
 .vscode/
 .idea/
+__pycache__/

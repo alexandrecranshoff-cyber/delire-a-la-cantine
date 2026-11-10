@@ -307,19 +307,26 @@ def build_textures():
     td.line((0, 470, 512, 470), fill=INK, width=4)
     save_all(tiles, "textures", "mur_cuisine.png", hd_width=512)
 
-    # Dessus de table rose (10 × 3 cases) : contour à l'encre, reflets, rayures.
-    table = Image.new("RGB", (1280, 384), (243, 150, 170))
+    # Nappe (10 × 3 cases) : damier pastel rose et jaune par case comme sur le plateau du livret,
+    # ourlet à l'encre et liseré clair. 128 px par case en HD.
+    cell = 128
+    table = Image.new("RGB", (10 * cell, 3 * cell), (246, 170, 190))
     bd = ImageDraw.Draw(table, "RGBA")
-    bd.rectangle((0, 0, 1279, 383), outline=INK, width=10)
-    bd.rectangle((12, 12, 1267, 371), outline=(255, 205, 215), width=5)
-    for _ in range(46):
-        x, y = rng.randrange(40, 1240), rng.randrange(40, 344)
-        bd.line((x, y, x + rng.randrange(-70, 70), y + rng.randrange(-16, 16)), fill=(200, 100, 125, 130), width=2)
-    for _ in range(7):
-        x = rng.randrange(60, 1100)
-        bd.polygon([(x, 30), (x + 90, 30), (x + 30, 354), (x - 60, 354)], fill=(255, 255, 255, 26))
-    speckle(table, rng, 400, [(160, 70, 95, 50), (255, 255, 255, 50)], (1, 2.5))
-    save_all(table, "textures", "table.png", hd_width=1280)
+    shades = [(247, 164, 188), (252, 226, 150), (250, 196, 206), (253, 214, 170)]
+    for ty in range(3):
+        for tx in range(10):
+            base = shades[1 + 2 * (tx % 2)] if (tx + ty) % 2 else shades[2 * ((tx + ty) // 2 % 2)]
+            k = rng.uniform(-6, 6)
+            col = tuple(int(max(0, min(255, c + k))) for c in base)
+            bd.rectangle((tx * cell, ty * cell, (tx + 1) * cell - 1, (ty + 1) * cell - 1), fill=col)
+    for k in range(1, 10):
+        bd.line((k * cell, 0, k * cell, 3 * cell), fill=(214, 110, 140, 150), width=3)
+    for k in range(1, 3):
+        bd.line((0, k * cell, 10 * cell, k * cell), fill=(214, 110, 140, 150), width=3)
+    bd.rectangle((0, 0, 10 * cell - 1, 3 * cell - 1), outline=INK, width=9)
+    bd.rectangle((11, 11, 10 * cell - 12, 3 * cell - 12), outline=(255, 240, 244), width=5)
+    speckle(table, rng, 260, [(180, 90, 115, 40), (255, 255, 255, 60)], (1, 2.2))
+    save_all(table, "textures", "table.png", hd_width=10 * cell)
 
     # Bois (bancs, portes), inox (bacs, pieds).
     wood = Image.new("RGB", (256, 256), (150, 96, 56))
@@ -367,9 +374,30 @@ def build_textures():
     print("textures")
 
 
+# --- Décor mural -----------------------------------------------------------------
+
+def build_decor():
+    """Manteaux aux patères et objets muraux (planches assets/reference/decors/planche_*.png)."""
+    sheets = {
+        "planche_manteaux.png": (5, 2, 288, ["manteau_%d" % i for i in range(10)]),
+        "planche_mural.png": (4, 2, 320, ["horloge", "menu", "extincteur", "panneau_liege",
+                                          "radiateur", "photo_classe", "affiche_mains", "fenetre"]),
+    }
+    for file, (cols, rows, height, names) in sheets.items():
+        rgb = d.load_rgb(REF / "decors" / file)
+        sheet = d.cutout(rgb, tolerance=14)
+        boxes, labels = d.components(sheet, merge=16, min_area=8000)
+        h, w = rgb.shape[:2]
+        for r in range(rows):
+            for c in range(cols):
+                img = d.crop_component(sheet, labels, pick(boxes, w * (c + 0.5) / cols, h * (r + 0.5) / rows))
+                save_all(img, "decor", f"{names[r * cols + c]}.png", hd_height=height)
+        print("decor", file, len(boxes))
+
+
 BUILDERS = {
     "pions": build_pawns, "accessoires": build_props, "projectiles": build_projectiles,
-    "effets": build_effects, "ecrans": build_screens, "textures": build_textures,
+    "effets": build_effects, "ecrans": build_screens, "textures": build_textures, "decor": build_decor,
 }
 
 if __name__ == "__main__":

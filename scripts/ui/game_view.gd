@@ -32,6 +32,7 @@ var _overlay := MultiMeshInstance3D.new()
 var _overlay_mesh := MultiMesh.new()
 var _cam_target := Vector3.ZERO
 var _cam_angle := 45.0
+var _cam_fixed := false           # contrôle visuel : la caméra reste sur la cible demandée
 var _cam_zoom := 24.0
 var _panning := false
 var _rotating := false
@@ -108,7 +109,7 @@ func _intro() -> void:
 		await hud.show_pass_screen(state.current_team)
 	busy = false
 	_select_first()
-	if selected != null:
+	if selected != null and not _cam_fixed:
 		_focus(pawns[selected.id].global_position)
 	for a in OS.get_cmdline_user_args():
 		if a == "rapide":
@@ -159,7 +160,7 @@ func _add_pawn(u: Unit) -> PawnView:
 			break
 	if u.kind == Unit.Kind.TEACHER:
 		look = Vector2(state.board.width / 2.0 - u.pos.x, state.board.height / 2.0 - u.pos.y)
-	p.set_facing(look)
+	p.set_facing(look, true)
 	p.face_camera(_cam_angle)
 	pawns[u.id] = p
 	return p
@@ -180,8 +181,8 @@ func _setup_environment() -> void:
 	sun.rotation_degrees = Vector3(-58, 32, 0)
 	sun.light_energy = 0.46
 	sun.light_color = Color(1.0, 0.97, 0.9)
-	# Pas d'ombres calculées : celles des pions et des tables sont dessinées, comme en BD.
-	# La version PC ajoute l'anticrénelage.
+	# Pas d'ombres calculées : celles des pions, des tables et des murs sont dessinées, comme
+	# en BD, et le rendu reste identique sur le web et sur PC. La version PC ajoute l'anticrénelage.
 	get_viewport().msaa_3d = Viewport.MSAA_4X if hd else Viewport.MSAA_DISABLED
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("amb="):
@@ -204,6 +205,7 @@ func _setup_environment() -> void:
 		elif a.begins_with("cible="):
 			var xy := a.split("=")[1].split(",")
 			_cam_target = Vector3(float(xy[0]), 0, float(xy[1]))
+			_cam_fixed = true
 
 
 func _update_camera() -> void:
@@ -833,6 +835,7 @@ func _play_move(e: Dictionary) -> void:
 	if not e.get("parallel", false) and not human_teams.has(unit.team):
 		await _focus(pawn.position)
 	var captives: Array = e.get("captives", [])
+	pawn.walk(true)
 	var tw := create_tween()
 	var prev: Vector2i = e["from"]
 	for p in path:
@@ -848,6 +851,7 @@ func _play_move(e: Dictionary) -> void:
 			for p in path:
 				ctw.tween_property(cp, "position", BoardView.cell_to_world(p, 0.0) + Vector3(0.45, 0, 0.2), STEP_TIME)
 	await tw.finished
+	pawn.walk(false)
 	if unit.status == Unit.Status.SATURATED or unit.status == Unit.Status.FLEEING:
 		fx.puff(pawn.position, 0.6)
 	_refresh_fog()
@@ -877,6 +881,8 @@ func _play_push(e: Dictionary) -> void:
 	var pusher: PawnView = pawns[e["id"]]
 	pusher.look_at_cell(e["from"])
 	pusher.hop(0.2)
+	if not e["path"].is_empty():
+		cart.set_facing(Vector2(e["path"][0] - e["from"]))
 	var tw := create_tween()
 	for p in e["path"]:
 		tw.tween_property(cart, "position", BoardView.cell_to_world(p), 0.14)
@@ -916,7 +922,7 @@ func _play_shot(e: Dictionary) -> void:
 	await _wait(0.12 * pace)
 
 	# Le projectile part en cloche.
-	pawn.hop(0.3)
+	await pawn.throw_anim()
 	Sound.play("robinet" if r.get("watering", false) else "lancer", -3.0)
 	var from := pawn.body_position()
 	var landing: Vector2i = e["victim_cell"]
