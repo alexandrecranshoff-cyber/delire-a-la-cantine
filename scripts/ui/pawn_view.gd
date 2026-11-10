@@ -12,8 +12,8 @@ const OUTLINE_SHADER := preload("res://shaders/contour.gdshader")
 ## Direction des ombres au sol (le soleil entre par les fenêtres, toujours du même côté).
 const SHADOW_DIR := Vector3(0.94, 0.0, -0.34)
 const LEAN := 0.22  # le carton penche un peu vers la caméra pour rester lisible vu de haut
-## Les modèles sortent de l'atelier 3D en regardant vers +X.
-const MODEL_YAW := -PI / 2.0
+## Angle à ajouter si un modèle ne regarde pas vers +Z (les nôtres sont remis de face avant le squelette).
+const MODEL_YAW := 0.0
 const OUTLINE_WIDTH := 0.014
 const THROW_SPEED := 2.2
 const THROW_RELEASE := 0.42   # fraction du geste où la main lâche le projectile

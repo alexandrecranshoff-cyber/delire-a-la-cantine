@@ -10,6 +10,8 @@ const LEVEL_PATH := "res://data/niveaux/niveau_1.json"
 const STEP_TIME := 0.085
 const ROTATE_STEP := 45.0
 const ROTATE_DRAG_SPEED := 0.4  # degrés par pixel
+## Hauteur de la caméra pour 1 m de recul : 0.85 donne une vue plongeante d'environ 40°, qui laisse voir les personnages de trois quarts.
+const CAM_HEIGHT := 0.85
 
 var state: GameState
 var level: Level
@@ -210,7 +212,7 @@ func _setup_environment() -> void:
 
 func _update_camera() -> void:
 	camera.size = _cam_zoom
-	var dir := Vector3(sin(deg_to_rad(_cam_angle)), 1.1, cos(deg_to_rad(_cam_angle))).normalized()
+	var dir := Vector3(sin(deg_to_rad(_cam_angle)), CAM_HEIGHT, cos(deg_to_rad(_cam_angle))).normalized()
 	var shake := Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * _shake
 	camera.position = _cam_target + dir * 60.0 + shake
 	camera.look_at(_cam_target + shake, Vector3.UP)
