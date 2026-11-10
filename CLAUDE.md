@@ -2,6 +2,15 @@
 
 Jeu vidéo de stratégie tactique au tour par tour (genre UFO / Jagged Alliance), adapté d'un jeu de plateau. Moteur : **Godot 4.6**, GDScript.
 
+## Cible et décisions de design
+
+- Plateforme : navigateur (export web Godot, rendu Compatibilité / WebGL 2). Garder les assets légers.
+- 3D, adaptation fidèle du plateau, jouée comme UFO : 12 points d'action par élève (1 PA par case, tir 4 PA une fois par tour), valeurs à régler.
+- Dés visibles à l'écran, brouillard de guerre et ligne de vue.
+- Modes : solo (campagne « année scolaire » avec expérience) et tour de rôle sur le même écran.
+- Style BD franco-belge original, années 80, bulles de BD. Noms d'origine conservés.
+- Game design complet : https://claude.ai/artifact/QPW5UDhbJLqegseVnz4nmJ
+
 ## Langue
 
 Communication, documentation et messages de commit en français. Code (noms de variables, fonctions, classes) en anglais, commentaires en français.

@@ -7,7 +7,7 @@ config_version=5
 
 config/name="Délire à la cantine"
 config/description="Jeu de stratégie au tour par tour dans une cantine qui part en vrille."
-config/features=PackedStringArray("4.6", "Forward Plus")
+config/features=PackedStringArray("4.6", "GL Compatibility")
 
 [display]
 
@@ -17,4 +17,5 @@ window/stretch/mode="canvas_items"
 
 [rendering]
 
-renderer/rendering_method="forward_plus"
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

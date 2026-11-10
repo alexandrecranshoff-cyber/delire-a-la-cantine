@@ -1,6 +1,6 @@
 # Délire à la cantine
 
-Jeu de stratégie tactique au tour par tour : 2 à 4 bandes d'élèves s'affrontent à coups de purée, de tripes et de yaourts dans une cantine, pendant que les profs tentent d'évacuer les chahuteurs et que le cuisinier défend sa cuisine.
+Jeu de stratégie tactique 3D au tour par tour, jouable dans le navigateur : 2 à 4 bandes d'élèves s'affrontent à coups de purée, de tripes et de yaourts dans une cantine, pendant que les profs tentent d'évacuer les chahuteurs et que le cuisinier défend sa cuisine.
 
 ## Prérequis
 
