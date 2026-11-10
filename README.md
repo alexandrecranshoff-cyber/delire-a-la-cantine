@@ -18,14 +18,47 @@ git lfs pull
 
 Puis ouvrir le dossier dans Godot (Importer > `project.godot`).
 
-## Jouer (maquette)
+## Jouer
 
-Ouvrir le projet dans Godot et lancer la scène principale (F5), ou ouvrir la version web publiée à chaque fusion sur `main` (onglet Actions, workflow « Version web »).
+Ouvrir le projet dans Godot et lancer la scène principale (F5), ou prendre une des deux versions construites à chaque fusion sur `main` (onglet Actions, workflow « Versions du jeu ») :
 
-- Clic gauche : choisir un élève de sa bande, puis une case (déplacement), une table au contact (monter), ou un pion (tir).
-- R : basculer en arrosage (au contact d'un robinet). Clic sur un chariot au contact, puis une case : le pousser.
-- Entrée : fin du tour.
-- Caméra : clic droit maintenu pour tourner librement, boutons ⟲ ⟳ ou touches Q et E pour tourner par huitièmes de tour ; molette pour zoomer ; flèches ou molette enfoncée pour déplacer la vue.
+- **Version web** : textures allégées (`assets/sd`), environ 9 Mo de données, publiée aussi sur GitHub Pages.
+- **Version PC** (Windows et Linux) : textures deux fois plus fines (`assets/hd`), anticrénelage 4x, musique en meilleure qualité.
+
+Le menu propose le solo contre l'ordinateur (trois difficultés : Récré, Cantine, Conseil de discipline) ou deux joueurs sur le même écran.
+
+- Clic gauche : choisir un élève de sa bande (ou Tab), puis une case (déplacement), une table au contact (monter), ou un pion (tir).
+- Cases vertes : il restera de quoi tirer. Jaunes : déplacement seul. Rouges : à portée d'un prof ou du cuisinier.
+- R : arroser (au contact d'un robinet). P : projeter un adversaire dans un bac. Clic sur un chariot au contact, puis une case : le pousser.
+- Entrée : fin du tour. V : vitesse. F1 : aide.
+- Caméra : clic droit maintenu pour tourner librement, boutons ou touches Q et E pour tourner par huitièmes de tour ; molette pour zoomer ; flèches ou molette enfoncée pour déplacer la vue.
+
+## Construire les deux versions
+
+```bash
+mkdir -p build/web build/pc && touch build/.gdignore
+godot --headless --path . --import
+godot --headless --path . --export-release "Web" build/web/index.html
+godot --headless --path . --export-release "Windows" build/pc/delire_a_la_cantine.exe
+godot --headless --path . --export-release "Linux" build/pc/delire_a_la_cantine.x86_64
+```
+
+La version web se lance derrière un petit serveur (`python3 -m http.server` dans `build/web`).
+
+## Régler la difficulté
+
+```bash
+godot --headless --path . -s tools/simuler_parties.gd -- parties=24 difficulte=difficile joueur=normal
+```
+
+Fait jouer l'ordinateur contre lui-même et affiche victoires, durée et sorties par bande. Les réglages sont dans `data/difficulte.json`.
+
+## Assets
+
+- `assets/reference/` : visuels de référence validés (non exportés).
+- `assets/hd/` et `assets/sd/` : images du jeu en deux qualités, produites par `tools/preparer_assets.py` à partir des références.
+- `assets/audio/sfx/` et musiques (`assets/*/musique/`) : générés avec Higgsfield.
+- `assets/fonts/` : Bangers et Patrick Hand, sous licence SIL Open Font License (textes joints).
 
 ## Tests
 

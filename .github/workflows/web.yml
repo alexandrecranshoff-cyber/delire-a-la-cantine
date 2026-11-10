@@ -1,6 +1,6 @@
-name: Version web
+name: Versions du jeu
 
-# Exporte le jeu pour le navigateur et le publie sur GitHub Pages à chaque fusion sur main.
+# Exporte la version web (publiée sur GitHub Pages) et la version PC (Windows, Linux) à chaque fusion sur main.
 on:
   push:
     branches: [main]
@@ -22,21 +22,32 @@ jobs:
       GODOT_VERSION: "4.6"
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - name: Installer Godot et les modèles d'export
         run: |
           curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
           unzip -q godot.zip && mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot
           curl -sSL -o templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
           mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
-          unzip -q -j templates.tpz "templates/web_nothreads_*" "templates/version.txt" -d "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          unzip -q -j templates.tpz "templates/web_nothreads_*" "templates/windows_release_x86_64*" "templates/linux_release.x86_64" "templates/version.txt" -d "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
       - name: Importer et tester
         run: |
           ./godot --headless --path . --import
           ./godot --headless --path . -s tests/run_tests.gd
       - name: Exporter pour le web
         run: |
-          mkdir -p build/web
+          mkdir -p build/web build/pc && touch build/.gdignore
           ./godot --headless --path . --export-release "Web" build/web/index.html
+      - name: Exporter pour PC
+        run: |
+          ./godot --headless --path . --export-release "Windows" build/pc/delire_a_la_cantine.exe
+          ./godot --headless --path . --export-release "Linux" build/pc/delire_a_la_cantine.x86_64
+      - name: Garder la version PC en téléchargement
+        uses: actions/upload-artifact@v4
+        with:
+          name: jeu-pc
+          path: build/pc
       - name: Garder la version web en téléchargement
         uses: actions/upload-artifact@v4
         with:

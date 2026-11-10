@@ -49,14 +49,14 @@ class RotateIcon:
 		if direction < 0:
 			draw_set_transform(Vector2(size.x, 0), 0.0, Vector2(-1, 1))
 		var c := size / 2.0
-		var r := minf(size.x, size.y) * 0.26
+		var r := minf(size.x, size.y) * 0.24
 		var from := deg_to_rad(-200.0)
 		var to := deg_to_rad(35.0)
 		draw_arc(c, r, from, to, 20, Color.WHITE, 3.5, true)
 		var tip := c + Vector2(cos(to), sin(to)) * r
 		var along := Vector2(-sin(to), cos(to))
 		var out := Vector2(cos(to), sin(to))
-		draw_colored_polygon([tip + along * 8.0, tip - out * 6.5 - along * 1.5, tip + out * 6.5 - along * 1.5], Color.WHITE)
+		draw_colored_polygon([tip + along * 10.0, tip - out * 8.0 - along * 2.0, tip + out * 8.0 - along * 2.0], Color.WHITE)
 
 
 var auto_pass := false  ## essais automatiques : l'écran « passe la main » se ferme seul
@@ -297,7 +297,7 @@ func _build_help() -> void:
 	col.add_child(BD.label("COMMENT JOUER", 54, BD.RED, true))
 	var lines := [
 		"But : être la dernière bande dans la cantine. À la sonnerie (tour 12), la bande qui garde le plus de moral gagne.",
-		"Clic sur un de tes élèves pour le choisir (ou Tab), clic sur une case verte pour y aller : 1 PA par case, 12 PA par tour.",
+		"Clic sur un de tes élèves pour le choisir (ou Tab), clic sur une case verte pour y aller : 1 PA par case, 12 PA par tour. Cases rouges : à portée d'un prof ou du cuisinier.",
 		"Clic sur un adversaire pour lui lancer ce qui te tombe sous la main : 4 PA, une fois par tour. Deux dés désignent le projectile.",
 		"Pour toucher, les dés de dextérité doivent atteindre la distance + la difficulté (CX) du projectile. Plus tu es près, mieux c'est.",
 		"Munitions : au contact d'une table (tours 1 à 4), puis seulement des bacs et des chariots de la cuisine. On garde une munition en poche.",

@@ -166,6 +166,30 @@ static func _teachers(state: GameState, events: Array) -> void:
 				events.append({"type": "capture", "id": t.id, "victim_id": grab.id, "cell": cell, "roll": result["roll"], "success": result["success"]})
 
 
+## Cases où un élève peut être saisi à la prochaine action des adultes : au contact d'une case qu'un
+## prof libre atteint en un déplacement, ou que le cuisinier réveillé atteint dans sa cuisine.
+## `team` >= 0 : seuls les adultes que cette bande voit comptent (brouillard).
+static func threat_cells(state: GameState, team: int = -1) -> Dictionary:
+	var out := {}
+	for t in state.units:
+		if t.status != Unit.Status.ACTIVE or not t.is_on_board():
+			continue
+		var cook := t.kind == Unit.Kind.COOK
+		if not (cook and state.cook_awake) and not (t.kind == Unit.Kind.TEACHER and t.captive_ids.is_empty()):
+			continue
+		if team >= 0 and not Visibility.unit_visible(state, team, t):
+			continue
+		var field := Pathing.field(state.board, [t.pos], cook)
+		var speed := _speed(state, t)
+		for c in field.keys():
+			if field[c] > speed:
+				continue
+			for n in Board.neighbors8(c):
+				if state.board.is_ground(n) and (not cook or state.board.is_kitchen(n)):
+					out[n] = true
+	return out
+
+
 static func _drag_captives(state: GameState, teacher: Unit) -> void:
 	for cid in teacher.captive_ids:
 		var v := state.get_unit(cid)

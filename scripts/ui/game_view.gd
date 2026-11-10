@@ -114,6 +114,11 @@ func _intro() -> void:
 		if a == "rapide":
 			_set_fast(true)
 			hud.set_fast(true)
+		elif a.begins_with("prof="):
+			# Contrôle visuel : pose un prof sur une case.
+			var pxy := a.split("=")[1].split(",")
+			_add_pawn(state.add_unit(Unit.Kind.TEACHER, "prof", Vector2i(int(pxy[0]), int(pxy[1])), Unit.NO_TEAM, "Prof"))
+			_refresh_all()
 		elif a.begins_with("survol="):
 			# Contrôle visuel : simule le survol d'une case.
 			var xy := a.split("=")[1].split(",")
@@ -520,15 +525,20 @@ func _hover(c: Vector2i) -> void:
 	var reach := Movement.reachable(state, selected)
 	var cells := []
 	var shot_cost := state.data.ap_cost("tir")
+	var threat := AutoPawns.threat_cells(state, viewer_team)
 	for k in reach.keys():
 		if k != selected.pos:
-			# Vert : il restera de quoi tirer ; jaune : déplacement seul.
+			# Vert : il restera de quoi tirer ; jaune : déplacement seul ; rouge : à portée d'un prof ou du cuisinier.
 			var keeps_shot: bool = not selected.has_shot and selected.ap - int(reach[k]) >= shot_cost
-			cells.append([k, Color(0.25, 0.95, 0.4, 0.42) if keeps_shot else Color(1.0, 0.85, 0.2, 0.36)])
+			var color := Color(0.25, 0.95, 0.4, 0.42) if keeps_shot else Color(1.0, 0.85, 0.2, 0.36)
+			if threat.has(k):
+				color = Color(1.0, 0.25, 0.2, 0.5)
+			cells.append([k, color])
 	if reach.has(c) and c != selected.pos:
 		for p in Movement.path_to(state, selected, c):
 			cells.append([p, Color(0.1, 0.6, 1.0, 0.95)])
-		hud.set_hint("Aller ici : %d PA (il en restera %d)" % [reach[c], selected.ap - reach[c]])
+		var warn := "  Attention : à portée d'un prof ou du cuisinier !" if threat.has(c) else ""
+		hud.set_hint("Aller ici : %d PA (il en restera %d).%s" % [reach[c], selected.ap - reach[c], warn])
 	else:
 		hud.set_hint("%s : %d PA" % [selected.name, selected.ap])
 	_show_cells(cells)

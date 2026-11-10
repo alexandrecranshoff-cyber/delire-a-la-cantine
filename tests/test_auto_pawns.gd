@@ -141,3 +141,11 @@ func test_sans_les_adultes_seuls_les_fuyards_bougent() -> void:
 	s.add_student("Ledur", 0, Vector2i(8, 1))
 	AutoPawns.run(s, false)
 	assert_eq(prof.pos, Vector2i(1, 1))
+
+
+func test_cases_a_portee_d_un_prof() -> void:
+	var s := make_state(HALL)
+	s.add_unit(Unit.Kind.TEACHER, "prof", Vector2i(1, 1))
+	var threat := AutoPawns.threat_cells(s)
+	assert_true(threat.has(Vector2i(6, 1)), "4 cases de marche, puis le contact")
+	assert_false(threat.has(Vector2i(7, 1)), "à plus de 5 cases, on est tranquille pour ce tour")
