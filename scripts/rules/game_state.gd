@@ -8,6 +8,18 @@ var dice: DiceRoller
 var units: Array[Unit] = []
 var turn := 1
 var current_team := 0
+var team_count := 2
+
+## Portes numérotées du niveau : "1".."6" -> cases. Sert à l'entrée des profs (1D6).
+var doors: Dictionary = {}
+## Tours de bande terminés depuis le début (rythme d'entrée des profs).
+var team_turns_done := 0
+var teachers_spawned := 0
+var cook_awake := false
+## Réglages de la partie (difficulté) qui remplacent ceux de regles_video.json : "prof_periode", "tours_max".
+var options: Dictionary = {}
+## Bandes jouées par l'ordinateur (numéros).
+var ai_teams: Array[int] = []
 
 var _next_id := 1
 
@@ -126,7 +138,7 @@ func start_team_turn(team: int) -> void:
 	for u in units:
 		if u.team != team or not u.is_on_board():
 			continue
-		u.ap = data.ap_per_turn()
+		u.ap = data.ap_per_turn() if u.kind == Unit.Kind.STUDENT else int(data.rules["pa_neutre_rallie"])
 		u.has_shot = false
 		if u.on_table:
 			u.turns_on_table += 1
@@ -169,6 +181,66 @@ func free_cell_near(c: Vector2i) -> Vector2i:
 func remove_from_board(u: Unit) -> void:
 	u.status = Unit.Status.OUT
 	release_captives(u)
+
+
+## Sortie par une porte : un prof emmène ses prisonniers avec lui.
+func exit_board(u: Unit) -> void:
+	for cid in u.captive_ids:
+		var v := get_unit(cid)
+		if v != null:
+			v.status = Unit.Status.OUT
+			v.captor_id = -1
+	u.captive_ids.clear()
+	u.status = Unit.Status.OUT
+
+
+func option(key: String) -> int:
+	return int(options.get(key, data.rules[key]))
+
+
+func max_turns() -> int:
+	return option("tours_max")
+
+
+## Élèves d'une bande encore dans la cantine (actifs ou tenus par un prof), neutres ralliés exclus.
+func students_left(team: int) -> Array[Unit]:
+	var out: Array[Unit] = []
+	for u in units:
+		if u.kind == Unit.Kind.STUDENT and u.team == team and not u.rallied:
+			if u.status == Unit.Status.ACTIVE or u.status == Unit.Status.CAPTURED:
+				out.append(u)
+	return out
+
+
+func team_moral(team: int) -> int:
+	var total := 0
+	for u in students_left(team):
+		total += u.moral
+	return total
+
+
+## Fin de partie : {"over", "winner" (-1 = personne), "reason" ("dernier", "sonnerie", "personne")}.
+## Adaptation vidéo : à la sonnerie (tours_max), la bande qui garde le plus de moral gagne (puis le plus d'élèves).
+func outcome() -> Dictionary:
+	var alive := teams_alive()
+	if alive.is_empty():
+		return {"over": true, "winner": -1, "reason": "personne"}
+	if alive.size() == 1:
+		return {"over": true, "winner": alive[0], "reason": "dernier"}
+	if turn > max_turns():
+		var best := -1
+		var best_key := [-1, -1]
+		var tie := false
+		for t in alive:
+			var key := [team_moral(t), students_left(t).size()]
+			if key > best_key:
+				best_key = key
+				best = t
+				tie = false
+			elif key == best_key:
+				tie = true
+		return {"over": true, "winner": -1 if tie else best, "reason": "sonnerie"}
+	return {"over": false, "winner": -1, "reason": ""}
 
 
 ## Bandes qui ont encore un élève « à elles » sur le terrain (neutres ralliés exclus).

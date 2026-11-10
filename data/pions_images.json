@@ -1,0 +1,49 @@
+{
+ "_note": "Généré par tools/preparer_assets.py : proportions des planches de pions (5 vues côte à côte).",
+ "images": {
+  "bigleux": {
+   "aspect": 0.4313,
+   "marge": 0.0625
+  },
+  "grobill": {
+   "aspect": 0.6156,
+   "marge": 0.0625
+  },
+  "zieugloque": {
+   "aspect": 0.4844,
+   "marge": 0.0625
+  },
+  "ledur": {
+   "aspect": 0.475,
+   "marge": 0.0625
+  },
+  "dudugenoux": {
+   "aspect": 0.4281,
+   "marge": 0.0625
+  },
+  "delamensa": {
+   "aspect": 0.4625,
+   "marge": 0.0625
+  },
+  "prof": {
+   "aspect": 0.4437,
+   "marge": 0.0625
+  },
+  "cuisinier": {
+   "aspect": 0.5594,
+   "marge": 0.0625
+  },
+  "neutre_lambda": {
+   "aspect": 0.425,
+   "marge": 0.0625
+  },
+  "neutre_timide": {
+   "aspect": 0.4813,
+   "marge": 0.0625
+  },
+  "neutre_casquette": {
+   "aspect": 0.4719,
+   "marge": 0.0625
+  }
+ }
+}
