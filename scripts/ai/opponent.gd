@@ -76,8 +76,30 @@ func _act(state: GameState, u: Unit) -> Array:
 			var events := GameActions.shoot(state, u, target)
 			if not events.is_empty():
 				return events
+	# Sans munition mais au contact d'un robinet : on arrose (livret : portée 5, CX 0, dégâts 1D).
+	if not u.has_shot and u.ap >= state.data.ap_cost("arrosage") and state.is_near_tap(u):
+		var wet := _water_target(state, u)
+		if wet != null:
+			var events := GameActions.shoot(state, u, wet, true)
+			if not events.is_empty():
+				return events
 	_done[u.id] = true
 	return _reposition(state, u)
+
+
+## Cible à arroser depuis le robinet : la plus intéressante à portée, de préférence la plus proche.
+func _water_target(state: GameState, u: Unit) -> Unit:
+	var best: Unit = null
+	var best_score := 0.0
+	for t in _targets(state):
+		var unit: Unit = t["unit"]
+		if Combat.cannot_shoot_reason(state, u, unit, true) != "":
+			continue
+		var score: float = float(t["weight"]) / float(maxi(1, Board.distance(u.pos, unit.pos)))
+		if score > best_score:
+			best_score = score
+			best = unit
+	return best
 
 
 ## Meilleur couple (case de tir, cible) atteignable avec `budget` PA de déplacement.

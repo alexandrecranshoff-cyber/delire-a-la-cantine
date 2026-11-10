@@ -22,7 +22,7 @@ Puis ouvrir le dossier dans Godot (Importer > `project.godot`).
 
 Ouvrir le projet dans Godot et lancer la scène principale (F5), ou prendre une des deux versions construites à chaque fusion sur `main` (onglet Actions, workflow « Versions du jeu ») :
 
-- **Version web** : textures allégées (`assets/sd`), environ 9 Mo de données, publiée aussi sur GitHub Pages.
+- **Version web** : textures allégées (`assets/sd`), environ 19 Mo de données, publiée aussi sur GitHub Pages.
 - **Version PC** (Windows et Linux) : textures deux fois plus fines (`assets/hd`), anticrénelage 4x, musique en meilleure qualité.
 
 Le menu propose le solo contre l'ordinateur (trois difficultés : Récré, Cantine, Conseil de discipline) ou deux joueurs sur le même écran.
@@ -57,6 +57,8 @@ Fait jouer l'ordinateur contre lui-même et affiche victoires, durée et sorties
 
 - `assets/reference/` : visuels de référence validés (non exportés).
 - `assets/hd/` et `assets/sd/` : images du jeu en deux qualités, produites par `tools/preparer_assets.py` à partir des références.
+- `assets/*/personnages/` : les onze personnages en 3D avec squelette ; `assets/animations/` : marche, repos, lancer et touché, partagés par tous. La fabrication est décrite dans [docs/personnages-3d.md](docs/personnages-3d.md).
+- Le mobilier (plateaux-repas, chariots, lavabos, portemanteaux, comptoir) est modelé par le code, dans `scripts/ui/props.gd`.
 - `assets/audio/sfx/` et musiques (`assets/*/musique/`) : générés avec Higgsfield.
 - `assets/fonts/` : Bangers et Patrick Hand, sous licence SIL Open Font License (textes joints).
 
@@ -75,4 +77,5 @@ Les tests tournent aussi sur GitHub à chaque PR.
 
 - [Règles du prototype](docs/regles-originales.md)
 - [Interprétations des règles](docs/interpretations-regles.md)
+- [Personnages 3D : de la fiche au pion animé](docs/personnages-3d.md)
 - Données de jeu : [`data/`](data/)
