@@ -1,6 +1,7 @@
 class_name Menu
 extends Control
-## Écran titre : mode de jeu (solo, deux joueurs, année scolaire), salle, difficulté, réglages.
+## Écran titre : campagne (année scolaire) ou partie seule (une des trois cartes, contre l'ordinateur
+## ou à deux), difficulté, réglages.
 
 signal start_game
 signal open_campaign
@@ -11,8 +12,10 @@ var _level_buttons := {}
 var _summary: Label
 var _difficulty_box: Control
 var _level_box: Control
+var _vs_buttons := {}
 var _play: Button
-var _mode := "solo"   # "solo", "duo" ou "annee"
+var _mode := "seule"  # "campagne" ou "seule"
+var _vs := "ordi"     # partie seule : "ordi" (contre l'ordinateur) ou "duo" (à deux sur le même écran)
 
 
 func _ready() -> void:
@@ -35,44 +38,63 @@ func _ready() -> void:
 	sheet.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	sheet.offset_right = -48
 	sheet.offset_bottom = -44
-	sheet.custom_minimum_size = Vector2(640, 0)
+	sheet.custom_minimum_size = Vector2(780, 0)
 	sheet.rotation = -0.012
 	add_child(sheet)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 10)
 	BD.content(sheet).add_child(col)
 
-	col.add_child(BD.label("MODE DE JEU", 30, Color("3a5fb0"), true))
 	var modes := HBoxContainer.new()
 	modes.add_theme_constant_override("separation", 10)
 	col.add_child(modes)
-	for spec in [["annee", "ANNÉE SCOLAIRE"], ["solo", "PARTIE SOLO"], ["duo", "2 JOUEURS"]]:
-		var b := BD.sticker(spec[1], Color("2f7fe6"), 26)
+	for spec in [["campagne", "CAMPAGNE"], ["seule", "PARTIE SEULE"]]:
+		var b := BD.sticker(spec[1], Color("2f7fe6"), 34)
 		b.toggle_mode = true
+		b.custom_minimum_size = Vector2(0, 64)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var mode: String = spec[0]
 		b.pressed.connect(func(): _set_mode(mode))
 		modes.add_child(b)
 		_mode_buttons[mode] = b
 
-	# Salle de la partie libre : les services construits de l'année (data/campagne.json).
+	# Partie seule : une des trois cartes (les services construits de data/campagne.json), puis l'adversaire.
 	_level_box = VBoxContainer.new()
 	_level_box.add_theme_constant_override("separation", 8)
 	col.add_child(_level_box)
-	_level_box.add_child(BD.label("SERVICE", 30, Color("3a5fb0"), true))
+	_level_box.add_child(BD.label("CHOISIS TA CARTE", 30, Color("3a5fb0"), true))
 	var lrow := HBoxContainer.new()
 	lrow.add_theme_constant_override("separation", 10)
 	_level_box.add_child(lrow)
+	var n := 0
 	for service in Campaign.load_data()["services"]:
 		if not Campaign.is_playable(service):
 			continue
+		n += 1
 		var path := Campaign.level_path(service)
 		var b := BD.sticker(str(service["titre"]).to_upper(), Color("e07a2f"), 21)
 		b.toggle_mode = true
+		b.icon = GameAssets.ui_texture("ecrans", "carte_%d.webp" % n)
+		b.expand_icon = true
+		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+		b.custom_minimum_size = Vector2(0, 176)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.tooltip_text = str(service["resume"])
 		b.pressed.connect(func(): _set_level(path))
 		lrow.add_child(b)
 		_level_buttons[path] = b
+	var vs := HBoxContainer.new()
+	vs.add_theme_constant_override("separation", 10)
+	_level_box.add_child(vs)
+	for spec in [["ordi", "CONTRE L'ORDINATEUR"], ["duo", "À DEUX, MÊME ÉCRAN"]]:
+		var b := BD.sticker(spec[1], Color("7a5fc0"), 22)
+		b.toggle_mode = true
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var k: String = spec[0]
+		b.pressed.connect(func(): _set_vs(k))
+		vs.add_child(b)
+		_vs_buttons[k] = b
 
 	_difficulty_box = VBoxContainer.new()
 	_difficulty_box.add_theme_constant_override("separation", 8)
@@ -152,7 +174,8 @@ func _ready() -> void:
 	add_child(credit)
 
 	_set_level(GameConfig.level_path)
-	_set_mode("annee" if GameConfig.campaign else ("solo" if GameConfig.solo else "duo"))
+	_vs = "ordi" if GameConfig.solo else "duo"
+	_set_mode("campagne" if GameConfig.campaign else "seule")
 	_set_difficulty(GameConfig.difficulty)
 	Sound.ambience(false)
 	Sound.music("musique_menu")
@@ -160,16 +183,26 @@ func _ready() -> void:
 
 func _set_mode(mode: String) -> void:
 	_mode = mode
-	GameConfig.solo = mode != "duo"
 	for k in _mode_buttons.keys():
 		_mode_buttons[k].set_pressed_no_signal(k == mode)
 		_mode_buttons[k].modulate = Color.WHITE if k == mode else Color(0.8, 0.8, 0.8, 0.85)
+	_level_box.visible = mode == "seule"
+	var year := CampaignStore.load_year() if mode == "campagne" else null
+	_play.text = "À TABLE !" if mode == "seule" else ("CONTINUER L'ANNÉE" if year != null else "COMMENCER L'ANNÉE")
+	_play.add_theme_font_size_override("font_size", 60 if mode == "seule" else 46)
+	_set_vs(_vs)
+
+
+## Partie seule : contre l'ordinateur ou à deux sur le même écran.
+func _set_vs(k: String) -> void:
+	_vs = k
+	GameConfig.solo = _mode == "campagne" or k == "ordi"
+	for key in _vs_buttons.keys():
+		_vs_buttons[key].set_pressed_no_signal(key == k)
+		_vs_buttons[key].modulate = Color.WHITE if key == k else Color(0.8, 0.8, 0.8, 0.85)
 	# Une année en cours garde sa difficulté : on la règle en commençant une nouvelle année.
-	var year := CampaignStore.load_year() if mode == "annee" else null
-	_difficulty_box.modulate = Color(1, 1, 1, 0.35) if mode == "duo" or year != null else Color.WHITE
-	_level_box.visible = mode != "annee"
-	_play.text = "À TABLE !" if mode != "annee" else ("CONTINUER L'ANNÉE" if year != null else "COMMENCER L'ANNÉE")
-	_play.add_theme_font_size_override("font_size", 60 if mode != "annee" else 46)
+	var year := CampaignStore.load_year() if _mode == "campagne" else null
+	_difficulty_box.modulate = Color(1, 1, 1, 0.35) if not GameConfig.solo or year != null else Color.WHITE
 	_set_difficulty(GameConfig.difficulty)
 
 
@@ -183,8 +216,9 @@ func _set_level(path: String) -> void:
 
 
 func _on_play() -> void:
-	GameConfig.campaign = _mode == "annee"
-	if _mode == "annee":
+	GameConfig.campaign = _mode == "campagne"
+	GameConfig.solo = _mode == "campagne" or _vs == "ordi"
+	if _mode == "campagne":
 		if CampaignStore.load_year() == null:
 			CampaignStore.save_year(Campaign.new_year(GameConfig.difficulty, GameData.load_default().student_names()))
 		open_campaign.emit()
@@ -193,20 +227,20 @@ func _on_play() -> void:
 
 
 func _set_difficulty(key: String) -> void:
-	if _mode == "annee" and CampaignStore.load_year() != null:
+	if _mode == "campagne" and CampaignStore.load_year() != null:
 		key = CampaignStore.load_year().difficulty()
 	GameConfig.difficulty = key
 	for k in _difficulty_buttons.keys():
 		_difficulty_buttons[k].set_pressed_no_signal(k == key)
 		_difficulty_buttons[k].modulate = Color.WHITE if k == key else Color(0.8, 0.8, 0.8, 0.85)
-	if _mode == "annee":
+	if _mode == "campagne":
 		var year := CampaignStore.load_year()
 		if year != null:
 			var s := year.current_service()
 			_summary.text = "Année en cours : %s, « %s ». Difficulté « %s »." % [str(s["mois"]).to_lower(), s["titre"], GameSetup.difficulties()[key]["nom"]]
 		else:
-			_summary.text = "La même bande toute l'année, de septembre à juin : expérience, colles et bulletin. " + str(GameSetup.difficulties()[key]["resume"])
+			_summary.text = "L'année scolaire : la même bande de service en service, expérience, colles et bulletin. " + str(GameSetup.difficulties()[key]["resume"])
 	elif GameConfig.solo:
-		_summary.text = str(GameSetup.difficulties()[key]["resume"])
+		_summary.text = str(GameSetup.difficulties()[key]["resume"]) + " Une partie dure 20 à 30 minutes."
 	else:
 		_summary.text = "Chacun sa bande, à tour de rôle. Un écran « passe la main » cache le jeu entre deux tours."

@@ -12,6 +12,7 @@ func _ready() -> void:
 		# Capture d'écran automatique (contrôle visuel) : capture=fichier.png attente=secondes
 		if a.begins_with("capture="):
 			_capture_later(a.split("=")[1], args)
+	GameConfig.campaign = args.has("annee") or GameConfig.campaign  # essais : menu ou service de l'année
 	if args.has("annee_ecran"):
 		GameConfig.show_bulletin = args.has("bulletin")
 		_show_campaign()  # contrôle visuel de l'écran de l'année
