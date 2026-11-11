@@ -354,7 +354,7 @@ func refresh() -> void:
 			team_col = Color("b9b4c4")
 	var adult := unit.kind == Unit.Kind.TEACHER or unit.kind == Unit.Kind.COOK
 	_team_ring.visible = (is_team or adult) and unit.kind != Unit.Kind.CART
-	_team_ring_mat.albedo_color = Color(team_col, 0.85)
+	_team_ring_mat.albedo_color = Color(team_col, 0.62)
 	if _gauge_back_mat != null:
 		_gauge_back_mat.albedo_color = team_col.darkened(0.25) if is_team else BD.INK
 	if _is_model and not _ring.visible:

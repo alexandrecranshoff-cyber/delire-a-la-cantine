@@ -195,6 +195,29 @@ static func plates() -> ArrayMesh:
 	)
 
 
+## Bac gastro en inox rempli d'un plat, posé sur le comptoir du self. Origine au fond du bac.
+static func gastro(food: Color) -> ArrayMesh:
+	return _cached("gastro" + food.to_html(), func(b: Builder):
+		b.box(Vector3(0, 0.07, 0), Vector3(0.62, 0.14, 0.46), Props.INOX, 0.012)
+		b.box(Vector3(0, 0.145, 0), Vector3(0.54, 0.02, 0.38), food)
+		for i in 3:
+			b.mound(Vector3(-0.16 + i * 0.16, 0.15, 0.04 * (i % 2)), 0.1, 0.06, food.lightened(0.12))
+		# Louche plantée dans le plat.
+		b.box(Vector3(0.18, 0.3, -0.1), Vector3(0.03, 0.34, 0.03), Props.INOX_DARK, 0.006)
+	)
+
+
+## Grande marmite à couvercle. Origine au sol.
+static func stockpot(color: Color) -> ArrayMesh:
+	return _cached("marmite" + color.to_html(), func(b: Builder):
+		b.cyl(Vector3.ZERO, 0.26, 0.26, 0.42, color, 0.014, 14)
+		b.cyl(Vector3(0, 0.42, 0), 0.28, 0.2, 0.05, color.darkened(0.25), 0.012, 14)
+		b.cyl(Vector3(0, 0.47, 0), 0.05, 0.05, 0.05, Color("2b2b33"), 0.0, 8)
+		for sx in [-1.0, 1.0]:
+			b.box(Vector3(sx * 0.3, 0.33, 0), Vector3(0.08, 0.04, 0.12), Color("2b2b33"))
+	)
+
+
 ## Pile de plateaux vides.
 static func tray_stack() -> ArrayMesh:
 	return _cached("tray_stack", func(b: Builder):

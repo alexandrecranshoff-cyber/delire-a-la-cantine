@@ -276,14 +276,53 @@ func _build_walls() -> void:
 			_multimesh(_box(Vector3(1.0, 0.03, 1.0), top), tops, false, pair[1])
 	# Cloison entre la salle et la cuisine : le comptoir du self, garni de vaisselle propre.
 	_multimesh(Props.counter(COUNTER_HEIGHT), counters)
-	var deco := [Props.tray_stack(), Props.plates(), Props.pitcher(), Props.plates(), Props.basket()]
-	var run := 0
+	# Le self est garni sur toute sa longueur : bacs de plats du jour, piles d'assiettes et de plateaux.
+	var deco := [Props.gastro(Color("a5c94f")), Props.plates(), Props.gastro(Color("e08a3a")), Props.tray_stack(),
+		Props.gastro(Color("f2e2b0")), Props.pitcher(), Props.gastro(Color("c9452f")), Props.basket()]
 	for i in counters.size():
 		var pos: Vector3 = counters[i].origin
-		var next_to: bool = i + 1 < counters.size() and counters[i + 1].origin.distance_to(pos) < 1.01
-		run = run + 1 if next_to else 0
-		if run > 0 and run % 3 == 2:
-			_mesh_at(deco[(run / 3) % deco.size()], pos + Vector3(0, COUNTER_HEIGHT + 0.06, 0), _rng.randf_range(-0.2, 0.2))
+		if i % 6 == 5:
+			continue  # un vide de temps en temps, pour ne pas faire un mur d'objets
+		_mesh_at(deco[i % deco.size()], pos + Vector3(0, COUNTER_HEIGHT + 0.06, 0), _rng.randf_range(-0.15, 0.15))
+	_build_kitchen_clutter(lists)
+
+
+## Cuisine : taches de graisse au sol et marmites posées sur les murets abaissés, pour qu'elle
+## reste habitée vue de l'angle par défaut (ses murs côté caméra sont abaissés).
+func _build_kitchen_clutter(lists: Dictionary) -> void:
+	var gradient := Gradient.new()
+	gradient.set_color(0, Color(0.32, 0.24, 0.1, 0.42))
+	gradient.set_color(1, Color(0.32, 0.24, 0.1, 0.0))
+	var tex := GradientTexture2D.new()
+	tex.gradient = gradient
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(0.5, 0.0)
+	tex.width = 64
+	tex.height = 64
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = tex
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	var plane := PlaneMesh.new()
+	plane.size = Vector2.ONE
+	plane.material = mat
+	var stains := []
+	for c in board.cells_of(Board.Terrain.KITCHEN):
+		if _rng.randf() < 0.22:
+			var s := _rng.randf_range(0.7, 1.6)
+			var basis := Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3(s, 1, s * _rng.randf_range(0.6, 1.0)))
+			stains.append(Transform3D(basis, cell_to_world(c, 0.012) + Vector3(_rng.randf_range(-0.3, 0.3), 0, _rng.randf_range(-0.3, 0.3))))
+	_multimesh(plane, stains, false)
+	var pots := [Props.stockpot(Props.INOX), Props.stockpot(Color("b9482f")), Props.plates(), Props.stockpot(Props.INOX_DARK)]
+	var k := 0
+	for side in SIDES.keys():
+		for c in lists[side][true]:
+			k += 1
+			if k % 3 != 0:
+				continue
+			_mesh_at(pots[(k / 3) % pots.size()], cell_to_world(c, WALL_LOW + 0.05), _rng.randf_range(0, TAU), _sides[side]["low"])
 
 
 ## Bande d'ombre en dégradé, posée au sol le long d'un mur (le mur est du côté -Z).
