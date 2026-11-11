@@ -47,7 +47,8 @@ var hud_auto := false
 var _last_turn_shown := 0
 var _tables_stocked := true
 var _odds: Odds
-var _pushed_this_turn := {}       # id des élèves qui ont poussé un chariot ce tour (texte d'indice)
+var _pushed_this_turn := {}       # id -> pourquoi cet élève ne tire plus ce tour (chariot, table)
+var _end_queued := false          # Entrée appuyée pendant une animation : fin du tour dès qu'elle s'achève
 var _skipping := false            # tour de l'ordinateur accéléré par le joueur
 var _advancing := false           # entre la fin du tour du joueur et son tour suivant
 const FAST_SPEED := 3.0
@@ -618,7 +619,7 @@ func _click(c: Vector2i) -> void:
 		events = GameActions.push_cart(state, selected, push_cart, c)
 		push_cart = null
 		if not events.is_empty():
-			_pushed_this_turn[selected.id] = true
+			_pushed_this_turn[selected.id] = "Pas de tir après avoir poussé un chariot."
 		if events.is_empty():
 			_refresh_all()
 			return
@@ -634,8 +635,10 @@ func _click(c: Vector2i) -> void:
 		events = GameActions.shoot(state, selected, target, watering)
 	elif Movement.can_climb(state, selected, c):
 		events = GameActions.climb(state, selected, c)
+		_pushed_this_turn[selected.id] = "Monter sur une table prend tout le tour : pas de tir."
 	elif Movement.can_descend(state, selected, c):
 		events = GameActions.descend(state, selected, c)
+		_pushed_this_turn[selected.id] = "Descendre d'une table prend tout le tour : pas de tir."
 	else:
 		events = GameActions.move(state, selected, c)
 	if events.is_empty():
@@ -656,6 +659,9 @@ func _run(events: Array) -> void:
 		return
 	busy = false
 	_refresh_all()
+	if _end_queued:
+		_end_queued = false
+		_end_turn()
 
 
 ## Victimes que la bande active peut projeter dans un bac ou un chariot.
@@ -687,6 +693,9 @@ func _project() -> void:
 
 func _end_turn() -> void:
 	if not _can_act():
+		# Pendant l'animation d'une action du joueur, on garde l'appui pour la fin de l'animation.
+		if busy and not over and not _advancing and human_teams.has(state.current_team):
+			_end_queued = true
 		return
 	busy = true
 	_select(null)
@@ -697,6 +706,7 @@ func _end_turn() -> void:
 func _advance() -> void:
 	busy = true
 	_advancing = true
+	_end_queued = false
 	_pushed_this_turn.clear()
 	_set_hovered(null)
 	hud.set_hint("Clic ou Espace : accélérer" if not opponents.is_empty() else "")
@@ -1294,7 +1304,7 @@ func _reason_text(reason: String) -> String:
 	match reason:
 		"deja_tire":
 			if selected != null and _pushed_this_turn.has(selected.id):
-				return "Pas de tir après avoir poussé un chariot."
+				return _pushed_this_turn[selected.id]
 			return "Déjà tiré ce tour."
 		"pas_assez_de_pa": return "Pas assez de PA pour tirer (%d)." % state.data.ap_cost("tir")
 		"cible_saturee": return "Déjà saturé : il file vers la sortie."
