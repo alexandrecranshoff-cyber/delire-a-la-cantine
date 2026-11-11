@@ -158,14 +158,14 @@ section { padding: 72px 0 20px; position: relative; }
 .bande { background: var(--bleu); border-top: var(--trait); border-bottom: var(--trait); margin-top: 90px; padding: 80px 0 0; overflow: hidden; }
 .bande .titre-section { color: var(--jaune); }
 .bande .chapeau { color: #fff; }
-.rangee { display: flex; justify-content: center; align-items: flex-end; gap: 18px; padding: 170px 20px 0; margin-top: 10px; }
+.rangee { display: flex; justify-content: center; align-items: flex-end; gap: 18px; padding: 150px 20px 0; margin-top: 10px; }
 .perso { position: relative; flex: 0 1 180px; display: flex; flex-direction: column; align-items: center; cursor: pointer; outline: none; }
 .perso img { height: var(--h); width: auto; max-width: none; filter: drop-shadow(1.5px 0 0 var(--encre)) drop-shadow(-1.5px 0 0 var(--encre)) drop-shadow(0 1.5px 0 var(--encre)) drop-shadow(0 -1.5px 0 var(--encre)) drop-shadow(6px 6px 0 rgba(0,0,0,.3)); transition: transform .25s; transform-origin: bottom center; }
 .perso:hover img, .perso:focus img, .perso.actif img { transform: translateY(-10px) rotate(-3deg) scale(1.04); }
 .fiche {
-  position: absolute; bottom: calc(var(--h) + 10px); left: 50%; width: 220px; z-index: 5;
+  position: absolute; bottom: calc(var(--h) + 58px); left: 50%; width: 360px; z-index: 5; overflow: visible;
   transform: translateX(-50%) scale(.6); opacity: 0; pointer-events: none; transition: .2s;
-  background: #fff; border: var(--trait); border-radius: 18px; padding: 12px 14px; box-shadow: var(--ombre);
+  background: #fff; border: var(--trait); border-radius: 18px; padding: 0; box-shadow: var(--ombre);
 }
 .fiche::after { content: ""; position: absolute; left: 50%; bottom: -20px; margin-left: -10px; border: 10px solid transparent; border-top: 14px solid var(--encre); }
 .perso:hover .fiche, .perso:focus .fiche, .perso.actif .fiche { opacity: 1; transform: translateX(-50%) scale(1); }
@@ -176,6 +176,9 @@ section { padding: 72px 0 20px; position: relative; }
 .perso:last-child:hover .fiche, .perso:last-child:focus .fiche, .perso:last-child.actif .fiche { transform: scale(1); }
 .perso:last-child .fiche::after { left: auto; right: 40px; }
 .fiche-mobile { display: none; }
+.planche-perso { background: #fffdf6; border-bottom: 3px solid var(--encre); border-radius: 14px 14px 0 0; overflow: hidden; }
+.fiche .planche-perso img { display: block; width: 100%; height: auto; aspect-ratio: 840 / 440; object-fit: contain; filter: none; transform: none !important; max-width: 100%; height: auto !important; }
+.fiche .corps { padding: 10px 14px 12px; }
 .fiche h3 { color: var(--rouge); font-size: 1.7rem; }
 .fiche p { margin: 2px 0 8px; font-size: 1.02rem; line-height: 1.2; }
 .fiche .stat { display: flex; justify-content: space-between; font-size: 1rem; }
@@ -240,7 +243,7 @@ footer { background: var(--encre); color: #d9cfb8; text-align: center; padding: 
 @media (min-width: 901px) and (max-width: 1200px) {
   .perso { flex-basis: 150px; }
   .perso img { height: calc(var(--h) * .85); }
-  .fiche { bottom: calc(var(--h) * .85 + 10px); }
+  .fiche { bottom: calc(var(--h) * .85 + 58px); }
   .ouverture .bouton.principal { font-size: 2.2rem; }
   .accroche span { font-size: 1.3rem; }
 }
@@ -393,10 +396,10 @@ var bande = [
 var rangee = document.getElementById("rangee");
 rangee.innerHTML = bande.map(function (p) {
   return '<div class="perso" tabindex="0" style="--h:' + p.h + 'px">' +
-    '<div class="fiche" role="tooltip"><h3>' + p.nom + '</h3><p>' + p.role + '</p>' +
+    '<div class="fiche" role="tooltip"><div class="planche-perso"><img src="images/fiche_' + p.id + '.webp" alt="Fiche de ' + p.nom + ' : de face, de trois quarts, de profil et de dos" width="840" height="440" loading="lazy"></div><div class="corps"><h3>' + p.nom + '</h3><p>' + p.role + '</p>' +
     '<div class="stat"><b>Dextérité</b><span>' + p.d + '</span></div>' +
     '<div class="stat"><b>Moral</b><span>' + p.moral + '</span></div>' +
-    '<div class="jauge"><i style="width:' + p.moral + '%"></i></div></div>' +
+    '<div class="jauge"><i style="width:' + p.moral + '%"></i></div></div></div>' +
     '<img src="images/perso_' + p.id + '.webp" alt="' + p.nom + '" loading="lazy">' +
     '<span class="nom">' + p.nom + '</span></div>';
 }).join("");
