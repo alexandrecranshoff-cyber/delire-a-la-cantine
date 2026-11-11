@@ -33,6 +33,7 @@ var _water_button: Button
 var _project_button: Button
 var _end_button: Button
 var _speed_button: Button
+var _music_button: Button
 var _banner: Control
 var _overlay: Control
 var _help: Control
@@ -114,6 +115,16 @@ func _build_top() -> void:
 		_speed_button.text = "VITESSE ×3" if on else "VITESSE ×1"
 		speed_toggled.emit(on))
 	row.add_child(_speed_button)
+	# Musique coupable en pleine partie, comme sur l'écran de démarrage (touche M).
+	_music_button = BD.sticker("MUSIQUE", Color("7a5fc0"), 20)
+	_music_button.toggle_mode = true
+	_music_button.tooltip_text = "Couper ou remettre la musique (M)"
+	_music_button.toggled.connect(func(on):
+		GameConfig.music_on = on
+		_show_music(on)
+		Sound.refresh_settings())
+	row.add_child(_music_button)
+	set_music(GameConfig.music_on)
 	var help_btn := BD.sticker("?", Color("2f9e8f"), 22)
 	help_btn.tooltip_text = "Comment jouer (F1)"
 	help_btn.pressed.connect(toggle_help)
@@ -328,8 +339,8 @@ func _build_help() -> void:
 		"Le cuisinier défend sa cuisine, lui aussi en fin de tour : il tire et plonge les imprudents dans le plat du jour.",
 		"Neutre touché : sur 1 il te rejoint, sur 6 il devient berserk, sinon il s'enfuit.",
 		"Clic sur une table au contact pour grimper dessus (tout le tour). Clic sur un chariot au contact pour le pousser de 3 cases.",
-		"Caméra : clic droit pour tourner, Q et E par crans, molette pour zoomer, flèches ou clic molette pour se déplacer.",
-		"Entrée : fin du tour.  R : arroser au robinet.  P : projeter.  V : vitesse.  Espace : accélérer le tour des autres.  Échap : désélectionner.",
+		"Caméra : clic droit pour tourner (glisser en haut ou en bas pour l'incliner, ou Page préc. et Page suiv.), Q et E par crans, molette pour zoomer, flèches ou clic molette pour se déplacer.",
+		"Entrée : fin du tour.  R : arroser au robinet.  P : projeter.  V : vitesse.  M : musique.  Espace : accélérer le tour des autres.  Échap : désélectionner.",
 	]
 	for line in lines:
 		var l := BD.label("•  " + line, 25)
@@ -514,6 +525,16 @@ func set_actions(can_water: bool, can_project: bool, human_turn: bool) -> void:
 	_water_button.disabled = not can_water
 	_project_button.disabled = not can_project
 	_end_button.disabled = not human_turn
+
+
+func set_music(on: bool) -> void:
+	_music_button.set_pressed_no_signal(on)
+	_show_music(on)
+
+
+func _show_music(on: bool) -> void:
+	_music_button.text = "MUSIQUE" if on else "MUSIQUE : NON"
+	_music_button.modulate = Color.WHITE if on else Color(0.7, 0.7, 0.7)
 
 
 func set_fast(on: bool) -> void:
