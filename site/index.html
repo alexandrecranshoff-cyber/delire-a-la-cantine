@@ -122,6 +122,8 @@ section { padding: 72px 0 20px; position: relative; }
 /* ---------- Le jeu ---------- */
 .scene { margin-bottom: 30px; display: grid; grid-template-columns: 1.55fr 1fr; gap: 44px; align-items: center; }
 .scene .case { transform: rotate(-1.2deg); }
+.annee-scene { margin-top: 70px; }
+.annee-scene .case { transform: rotate(1deg); }
 .onomato {
   position: absolute; z-index: 3; pointer-events: none;
   font-family: var(--titre); color: var(--jaune); -webkit-text-stroke: 2px var(--encre);
@@ -304,8 +306,8 @@ footer { background: var(--encre); color: #d9cfb8; text-align: center; padding: 
         <p class="bulle">Le hachis est froid, les rillettes volent bas et le surveillant a sorti son sifflet. Ta bande de six doit être la dernière debout quand la sonnerie retentira.</p>
         <div class="chiffres">
           <div class="chiffre"><b>6</b><span>élèves dans ta bande</span></div>
-          <div class="chiffre"><b>11</b><span>plats à lancer</span></div>
-          <div class="chiffre"><b>30-60</b><span>minutes par partie</span></div>
+          <div class="chiffre"><b>3</b><span>cantines à retourner</span></div>
+          <div class="chiffre"><b>20-30</b><span>minutes par partie</span></div>
         </div>
       </div>
     </div>
@@ -330,6 +332,34 @@ footer { background: var(--encre); color: #d9cfb8; text-align: center; padding: 
         <div class="image"><img src="images/case_cuisine.webp" alt="La cuisine avec ses bacs de purée et de tripes et ses chariots" width="800" height="600" loading="lazy"></div>
         <div class="texte"><h3>Ravitaille-toi</h3><p>Après quatre tours, les assiettes sont vides : file à la cuisine, aux bacs et aux chariots… si le cuisinier te laisse passer.</p></div>
       </article>
+    </div>
+  </section>
+
+  <section class="wrap" id="annee" aria-labelledby="titre-annee">
+    <h2 class="titre-section apparait" id="titre-annee">Une année scolaire</h2>
+    <p class="chapeau apparait">Trois services, trois cantines. Joue-les à la suite en campagne, ou choisis-en une pour une partie seule.</p>
+    <div class="planche">
+      <article class="case apparait">
+        <span class="legende">Septembre</span>
+        <div class="image"><img src="images/niveau_rentree.webp" alt="La rentrée : la cantine du collège, tables roses et carrelage turquoise" width="800" height="600" loading="lazy"></div>
+        <div class="texte"><h3>La rentrée</h3><p>La cantine du livret, tables garnies et surveillants encore endormis.</p></div>
+      </article>
+      <article class="case apparait">
+        <span class="legende">Novembre</span>
+        <div class="image"><img src="images/niveau_poisson.webp" alt="Jour du poisson : longues tables et chariot à poisson" width="800" height="600" loading="lazy"></div>
+        <div class="texte"><h3>Jour du poisson</h3><p>Tables en long, chariot à poisson et menu du vendredi : harengs et rillettes volent bas.</p></div>
+      </article>
+      <article class="case apparait">
+        <span class="legende">Décembre</span>
+        <div class="image"><img src="images/niveau_noel.webp" alt="Repas de Noël : cantine défraîchie avec des flaques au sol" width="800" height="600" loading="lazy"></div>
+        <div class="texte"><h3>Repas de Noël</h3><p>Dinde et bûche au menu, mais le toit fuit : chaque flaque coûte 2 points d'action.</p></div>
+      </article>
+    </div>
+    <div class="scene annee-scene">
+      <figure class="case apparait" style="margin:0">
+        <img src="images/annee_scolaire.webp" alt="L'écran de l'année scolaire : les mois, la bande et les améliorations à acheter" width="1400" height="665" loading="lazy">
+      </figure>
+      <p class="bulle apparait">Entre deux services, ta bande gagne de l'expérience : plus de moral, plus d'adresse, un point d'action en plus. Mais gare à la colle : un élève emmené par le surveillant commence le service suivant affaibli.</p>
     </div>
   </section>
 
@@ -359,7 +389,7 @@ footer { background: var(--encre); color: #d9cfb8; text-align: center; padding: 
   <section class="final trame" id="jouer" aria-labelledby="titre-jouer">
     <div class="wrap">
       <h2 class="titre-section" id="titre-jouer">À table !</h2>
-      <p class="chapeau">Seul contre l'ordinateur ou à deux sur le même écran, à trois niveaux de difficulté.</p>
+      <p class="chapeau">L'année scolaire complète ou une partie seule dans la cantine de ton choix, contre l'ordinateur ou à deux sur le même écran, à trois niveaux de difficulté.</p>
       <div class="niveaux">
         <span class="niveau"><b>Récré</b>pour découvrir</span>
         <span class="niveau"><b>Cantine</b>la partie du livret</span>
