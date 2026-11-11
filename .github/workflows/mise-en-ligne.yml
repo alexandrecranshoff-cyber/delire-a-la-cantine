@@ -1,8 +1,9 @@
 name: Mise en ligne sur iomino.fr
 
-# Envoie la version web sur l'hébergement LWS par FTP, après chaque export réussi de « Versions du jeu ».
+# Envoie la version web sur l'hébergement LWS par FTP, après chaque export réussi de « Versions du jeu »,
+# puis les versions PC zippées dans le dossier telecharger/ voisin (liens de la page de présentation).
 # Ne fait rien tant que la variable du dépôt MISE_EN_LIGNE ne vaut pas « oui » (Settings › Secrets and variables › Actions › Variables).
-# Secrets : FTP_SERVEUR, FTP_UTILISATEUR, FTP_MOT_DE_PASSE. Variables facultatives : FTP_DOSSIER (htdocs/cantine/ par défaut), FTP_PROTOCOLE (ftps par défaut, ftp si LWS refuse le chiffrement).
+# Secrets : FTP_SERVEUR, FTP_UTILISATEUR, FTP_MOT_DE_PASSE. Variables facultatives : FTP_DOSSIER (htdocs/cantine/ par défaut), FTP_DOSSIER_PC (par défaut : FTP_DOSSIER avec telecharger/ à la place de cantine/), FTP_PROTOCOLE (ftps par défaut, ftp si LWS refuse le chiffrement).
 on:
   workflow_run:
     workflows: ["Versions du jeu"]
@@ -43,3 +44,31 @@ jobs:
           protocol: ${{ vars.FTP_PROTOCOLE || 'ftps' }}
           local-dir: site/
           server-dir: ${{ vars.FTP_DOSSIER || 'htdocs/cantine/' }}
+      - name: Récupérer la version PC exportée
+        uses: actions/download-artifact@v4
+        with:
+          name: jeu-pc
+          path: pc
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Zipper la version PC
+        env:
+          DOSSIER: ${{ vars.FTP_DOSSIER || 'htdocs/cantine/' }}
+          DOSSIER_PC: ${{ vars.FTP_DOSSIER_PC }}
+        run: |
+          mkdir -p telecharger
+          chmod +x pc/delire_a_la_cantine.x86_64
+          (cd pc && zip -q ../telecharger/delire_a_la_cantine_pc_windows.zip delire_a_la_cantine.exe)
+          (cd pc && zip -q ../telecharger/delire_a_la_cantine_pc_linux.zip delire_a_la_cantine.x86_64)
+          ls -la telecharger
+          if [ -z "$DOSSIER_PC" ]; then DOSSIER_PC="${DOSSIER%cantine/}telecharger/"; fi
+          echo "DOSSIER_PC=$DOSSIER_PC" >> "$GITHUB_ENV"
+      - name: Envoyer la version PC par FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVEUR }}
+          username: ${{ secrets.FTP_UTILISATEUR }}
+          password: ${{ secrets.FTP_MOT_DE_PASSE }}
+          protocol: ${{ vars.FTP_PROTOCOLE || 'ftps' }}
+          local-dir: telecharger/
+          server-dir: ${{ env.DOSSIER_PC }}
