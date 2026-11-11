@@ -9,3 +9,5 @@ static var players := 2
 static var music_on := true
 static var sound_on := true
 static var fast := false
+## Sauvegarde à reprendre au prochain lancement de partie (vide : nouvelle partie).
+static var pending_load := {}

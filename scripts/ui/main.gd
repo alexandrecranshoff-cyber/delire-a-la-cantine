@@ -20,6 +20,8 @@ func _ready() -> void:
 				GameConfig.seed_value = int(a.split("=")[1])
 			if a == "duo":
 				GameConfig.solo = false
+			if a == "reprendre":
+				GameConfig.pending_load = SaveSlots.all().get("auto", {})  # essais : reprise automatique
 		_show_game()
 	else:
 		_show_menu()
@@ -38,6 +40,8 @@ func _show_menu() -> void:
 	layer.add_child(menu)
 	menu.start_game.connect(_show_game)
 	_swap(layer)
+	if OS.get_cmdline_user_args().has("sauvegardes"):
+		menu.add_child(SavePanel.new(false))  # contrôle visuel de la fenêtre des sauvegardes
 
 
 func _show_game() -> void:

@@ -13,6 +13,21 @@ func _init(seed_value: int = 0) -> void:
 	_rng.seed = seed_value
 
 
+func rng_seed() -> int:
+	return _rng.seed
+
+
+func rng_state() -> int:
+	return _rng.state
+
+
+## Reprend une partie sauvegardée : même graine, même position dans la suite des tirages.
+func restore(seed_value: int, state_value: int) -> void:
+	_rng.seed = seed_value
+	_rng.state = state_value
+	_forced.clear()
+
+
 ## Impose les prochaines faces (tests, rejeu). Elles sont consommées dans l'ordre.
 func force(values: Array) -> void:
 	for v in values:

@@ -53,6 +53,9 @@ var _tables_stocked := true
 var _odds: Odds
 var _pushed_this_turn := {}       # id -> pourquoi cet élève ne tire plus ce tour (chariot, table)
 var _end_queued := false          # Entrée appuyée pendant une animation : fin du tour dès qu'elle s'achève
+var _resume := {}                 # sauvegarde reprise au lancement (vide : nouvelle partie)
+var _seed := 0
+var _save_panel: SavePanel
 var _skipping := false            # tour de l'ordinateur accéléré par le joueur
 var _advancing := false           # entre la fin du tour du joueur et son tour suivant
 const FAST_SPEED := 3.0
@@ -64,11 +67,22 @@ func _ready() -> void:
 	var data := GameData.load_default()
 	level = Level.load_file(LEVEL_PATH)
 	var s := GameConfig.seed_value if GameConfig.seed_value != 0 else int(Time.get_unix_time_from_system())
+	_resume = GameConfig.pending_load
+	GameConfig.pending_load = {}
+	if not _resume.is_empty():
+		var cfg: Dictionary = _resume["config"]
+		GameConfig.solo = bool(cfg["solo"])
+		GameConfig.difficulty = str(cfg["difficulty"])
+		GameConfig.players = int(cfg["players"])
+		s = int(str(cfg["seed"]))
+	_seed = s
 	var ai: Array = [1] if GameConfig.solo else []
 	state = GameSetup.new_game(level, data, s, GameConfig.players, ai, GameConfig.difficulty if GameConfig.solo else "")
 	_odds = Odds.new(data)
 	if not GameConfig.solo:
 		state.options["prof_periode"] = int(GameSetup.difficulties()["normal"]["prof_periode"])
+	if not _resume.is_empty() and not SaveGame.apply(state, _resume["state"]):
+		_resume = {}  # sauvegarde illisible : nouvelle partie
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("tours="):
 			state.options["tours_max"] = int(a.split("=")[1])  # essais : partie courte
@@ -80,7 +94,13 @@ func _ready() -> void:
 		else:
 			human_teams.append(t)
 		_stats[t] = {"tirs": 0, "touches": 0, "satures": 0, "emmenes": 0, "plonges": 0}
+		var saved_stats: Dictionary = _resume.get("stats", {})
+		if saved_stats.has(str(t)):
+			for k in _stats[t].keys():
+				_stats[t][k] = int(saved_stats[str(t)].get(k, 0))
 	viewer_team = human_teams[0] if not human_teams.is_empty() else 0
+	if not _resume.is_empty() and human_teams.has(state.current_team):
+		viewer_team = state.current_team
 
 	_setup_environment()
 	board_view = BoardView.new()
@@ -103,6 +123,7 @@ func _ready() -> void:
 	hud.menu_pressed.connect(func(): back_to_menu.emit())
 	hud.replay_pressed.connect(func(): replay.emit())
 	hud.speed_toggled.connect(_set_fast)
+	hud.save_pressed.connect(_open_save_panel)
 	hud.set_fast(GameConfig.fast)
 	_set_fast(GameConfig.fast)
 	hud.log_line("[b]Service de midi.[/b] Graine des dés : %d." % s)
@@ -118,12 +139,20 @@ func _exit_tree() -> void:
 
 
 func _intro() -> void:
-	_last_turn_shown = 1
-	await hud.show_banner("À TABLE !", BD.YELLOW, "Tour 1 : %s" % BD.team_name(state.current_team).to_lower(), 1.0)
+	_last_turn_shown = state.turn
+	if _resume.is_empty():
+		await hud.show_banner("À TABLE !", BD.YELLOW, "Tour 1 : %s" % BD.team_name(state.current_team).to_lower(), 1.0)
+	else:
+		if not state.tables_have_ammo():
+			_tables_stocked = false
+			board_view.set_tables_stocked(false)
+		hud.log_line("[b]Partie reprise[/b] au tour %d." % state.turn)
+		await hud.show_banner("REPRISE !", BD.YELLOW, "Tour %d : %s" % [state.turn, BD.team_name(state.current_team).to_lower()], 1.0)
 	_end_skip()
 	if human_teams.size() > 1:
 		await hud.show_pass_screen(state.current_team)
 	busy = false
+	_autosave()
 	_select_first()
 	if selected != null and not _cam_fixed:
 		_focus(pawns[selected.id].global_position)
@@ -319,6 +348,8 @@ func _skip_others() -> void:
 # --- Entrées -----------------------------------------------------------------
 
 func _unhandled_input(event: InputEvent) -> void:
+	if is_instance_valid(_save_panel):
+		return
 	if _advancing and ((event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT) \
 			or (event is InputEventKey and event.pressed and event.keycode == KEY_SPACE)):
 		_skip_others()
@@ -376,6 +407,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_set_fast(not GameConfig.fast)
 				hud.set_fast(GameConfig.fast)
 			KEY_F1, KEY_H: hud.toggle_help()
+			KEY_F5: _open_save_panel()
 			KEY_ESCAPE:
 				if hud.help_open():
 					hud.toggle_help()
@@ -752,9 +784,45 @@ func _advance() -> void:
 		await hud.show_pass_screen(state.current_team)
 	viewer_team = state.current_team if human_teams.has(state.current_team) else viewer_team
 	busy = false
+	_autosave()
 	_select_first()
 	if selected != null:
 		_focus(pawns[selected.id].global_position)
+
+
+# --- Sauvegarde ------------------------------------------------------------------
+
+func _save_entry() -> Dictionary:
+	var stats := {}
+	for t in _stats.keys():
+		stats[str(t)] = _stats[t].duplicate()
+	var now := Time.get_datetime_dict_from_system()
+	return {
+		"date": "%02d/%02d à %02dh%02d" % [now["day"], now["month"], now["hour"], now["minute"]],
+		"config": {"solo": GameConfig.solo, "difficulty": GameConfig.difficulty, "players": GameConfig.players, "seed": str(_seed)},
+		"stats": stats,
+		"state": SaveGame.to_dict(state),
+	}
+
+
+## Début de chaque tour du joueur : la reprise automatique suit la partie.
+func _autosave() -> void:
+	if not over and human_teams.has(state.current_team) and not hud_auto:
+		SaveSlots.write("auto", _save_entry())
+
+
+func _open_save_panel() -> void:
+	if not _can_act():
+		hud.set_hint("On sauvegarde pendant son tour, quand rien ne bouge.")
+		return
+	_save_panel = SavePanel.new(true)
+	_save_panel.chosen.connect(func(key: String):
+		var ok := SaveSlots.write(key, _save_entry())
+		_save_panel.queue_free()
+		hud.set_hint("Partie sauvegardée : %s." % SaveSlots.title(key).to_lower() if ok else "La sauvegarde a échoué.")
+		if ok:
+			hud.log_line("Partie sauvegardée (%s)." % SaveSlots.title(key).to_lower()))
+	hud.add_child(_save_panel)
 
 
 func _end_skip() -> void:
