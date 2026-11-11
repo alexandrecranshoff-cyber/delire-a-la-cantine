@@ -14,9 +14,11 @@ const SHADOW_DIR := Vector3(0.94, 0.0, -0.34)
 const LEAN := 0.22  # le carton penche un peu vers la caméra pour rester lisible vu de haut
 ## Angle à ajouter si un modèle ne regarde pas vers +Z (les nôtres sont remis de face avant le squelette).
 const MODEL_YAW := 0.0
-const OUTLINE_WIDTH := 0.014
+## Épaisseur du contour, en mètres : environ 2 px à l'écran au zoom d'ouverture.
+const OUTLINE_WIDTH := 0.011
 const THROW_SPEED := 2.2
-const THROW_RELEASE := 0.42   # fraction du geste où la main lâche le projectile
+const THROW_RELEASE := 0.42
+const THROW_END := 0.6        # fraction du geste où l'on revient au repos   # fraction du geste où la main lâche le projectile
 
 static var _blob: Texture2D
 
@@ -46,6 +48,9 @@ var _cam_angle := 45.0
 var _look := {}
 var _bob := 0.0
 var _turn: Tween
+var _ink := BD.INK                # couleur du contour hors sélection (couleur de bande pour les élèves)
+var _base: MeshInstance3D
+var _rim: MeshInstance3D
 var _action := 0                  # numéro de l'animation en cours, pour ne pas couper la suivante
 
 
@@ -202,6 +207,7 @@ func _setup_blob(radius: float) -> void:
 
 func _setup_base() -> void:
 	var base := MeshInstance3D.new()
+	_base = base
 	var cyl := CylinderMesh.new()
 	cyl.top_radius = 0.4
 	cyl.bottom_radius = 0.42
@@ -214,6 +220,7 @@ func _setup_base() -> void:
 	base.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(base)
 	var rim := MeshInstance3D.new()
+	_rim = rim
 	var rim_mesh := CylinderMesh.new()
 	rim_mesh.top_radius = 0.47
 	rim_mesh.bottom_radius = 0.47
@@ -307,6 +314,19 @@ func refresh() -> void:
 		team_col = Color("ffffff")
 	_material.set_shader_parameter("border_color", team_col)
 	_base_mat.albedo_color = team_col
+	# Élèves : contour à la couleur de leur bande, pour savoir à qui est un pion même quand son
+	# socle est caché. Les autres gardent le trait d'encre, et les neutres un petit socle gris.
+	var is_team := unit.kind == Unit.Kind.STUDENT or unit.rallied
+	_ink = team_col.darkened(0.15) if is_team else BD.INK
+	if _base != null:
+		var neutral := unit.kind == Unit.Kind.NEUTRAL and not unit.rallied
+		_base.scale = Vector3(0.72, 1, 0.72) if neutral else Vector3.ONE
+		_rim.scale = Vector3(0.66, 1, 0.66) if neutral else Vector3.ONE
+		if neutral:
+			team_col = Color("b9b4c4")
+	if _is_model and not _ring.visible:
+		_outline.set_shader_parameter("color", _ink)
+		_outline.set_shader_parameter("width", OUTLINE_WIDTH * (1.4 if is_team else 1.0))
 	var tint := Color.WHITE
 	var amount := 0.0
 	match unit.status:
@@ -346,7 +366,7 @@ func set_selected(on: bool) -> void:
 	_label.modulate = BD.YELLOW
 	if _is_model:
 		# Le pion choisi respire et son contour passe au jaune.
-		_outline.set_shader_parameter("color", BD.YELLOW if on else BD.INK)
+		_outline.set_shader_parameter("color", BD.YELLOW if on else _ink)
 		_outline.set_shader_parameter("width", OUTLINE_WIDTH * (1.7 if on else 1.0))
 		if _anim != null and _anim.current_animation in ["", "repos"]:
 			if on:
@@ -426,9 +446,9 @@ func _process(delta: float) -> void:
 func _rest_pose() -> void:
 	if _anim == null or not _anim.has_animation("repos"):
 		return
-	_anim.play("repos")
+	# Tout le monde respire doucement, chacun à son rythme, pour que la salle ne soit pas figée.
+	_anim.play("repos", 0.25, 0.55 + fmod(unit.id * 0.13, 0.3))
 	_anim.seek(fmod(unit.id * 0.37, _anim.get_animation("repos").length), true)
-	_anim.pause()
 
 
 ## Marche sur place pendant que le jeu déplace le pion.
@@ -445,7 +465,8 @@ func walk(on: bool) -> void:
 
 
 ## Joue une animation une fois, puis revient au repos.
-func _play_once(clip: String, speed: float, from: float = 0.0) -> void:
+## `until` : fraction du clip où l'on s'arrête pour revenir au repos en fondu.
+func _play_once(clip: String, speed: float, from: float = 0.0, until: float = 1.0) -> void:
 	if _anim == null or not _anim.has_animation(clip):
 		return
 	_action += 1
@@ -453,10 +474,10 @@ func _play_once(clip: String, speed: float, from: float = 0.0) -> void:
 	_anim.play(clip, 0.08, speed)
 	if from > 0.0:
 		_anim.seek(from, true)
-	await get_tree().create_timer((_anim.get_animation(clip).length - from) / speed, false).timeout
+	await get_tree().create_timer((_anim.get_animation(clip).length * until - from) / speed, false).timeout
 	if mine == _action and is_inside_tree():
-		if _ring.visible:
-			_anim.play("repos", 0.2)
+		if _ring.visible or until < 1.0:
+			_anim.play("repos", 0.25)
 		else:
 			_rest_pose()
 
@@ -467,7 +488,9 @@ func throw_anim() -> void:
 		hop(0.3)
 		return
 	var length := _anim.get_animation("lancer").length
-	_play_once("lancer", THROW_SPEED)
+	# La fin du clip fait basculer le lanceur presque à l'horizontale : vu de haut, on dirait une
+	# chute. On s'arrête juste après le lâcher.
+	_play_once("lancer", THROW_SPEED, 0.0, THROW_END)
 	await get_tree().create_timer(length * THROW_RELEASE / THROW_SPEED, false).timeout
 
 

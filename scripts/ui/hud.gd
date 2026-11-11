@@ -265,13 +265,24 @@ func _build_bottom() -> void:
 
 
 func _build_hint() -> void:
-	_hint = BD.label("", 28, Color.WHITE)
+	_hint = BD.label("", 26, BD.INK)
+	var strip := StyleBoxFlat.new()
+	strip.bg_color = Color("fffbea")
+	strip.border_color = BD.INK
+	strip.set_border_width_all(3)
+	strip.set_corner_radius_all(6)
+	strip.content_margin_left = 16
+	strip.content_margin_right = 16
+	strip.content_margin_top = 2
+	strip.content_margin_bottom = 2
+	_hint.add_theme_stylebox_override("normal", strip)
 	_hint.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	_hint.offset_bottom = -250
 	_hint.offset_top = -292
 	_hint.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	BD.outline(_hint, 10)
+	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hint.visible = false
 	_root.add_child(_hint)
 
 
@@ -344,14 +355,15 @@ func set_status(state: GameState, human_turn: bool) -> void:
 	_end_button.disabled = not human_turn
 
 
-func set_unit(u: Unit, max_ap: int) -> void:
+## `playing` : nom de la bande qui joue quand ce n'est pas au joueur (ordinateur, profs).
+func set_unit(u: Unit, max_ap: int, playing: String = "") -> void:
 	if u == null:
 		_card.modulate = Color(1, 1, 1, 0.55)
 		_portrait.texture = null
-		_name_label.text = "Choisis un élève"
+		_name_label.text = "Choisis un élève" if playing == "" else playing.to_upper() + " JOUE…"
 		_moral_bar.value = 0
 		_moral_label.text = ""
-		_info_label.text = "Clique sur un de tes pions, ou appuie sur Tab."
+		_info_label.text = "Clique sur un de tes pions, ou appuie sur Tab." if playing == "" else "Regarde bien : ton tour arrive."
 		_fill_ap(0, 0)
 		return
 	_card.modulate = Color.WHITE
@@ -480,6 +492,7 @@ func set_roster(units: Array, selected: Unit) -> void:
 
 func set_hint(text: String) -> void:
 	_hint.text = text
+	_hint.visible = text != ""
 
 
 func set_watering(on: bool) -> void:

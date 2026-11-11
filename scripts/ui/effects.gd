@@ -51,12 +51,41 @@ func throw_projectile(projectile: String, from: Vector3, to: Vector3, time: floa
 	add_child(s)
 	var arc := clampf(from.distance_to(to) * 0.22, 0.6, 2.6)
 	var tw := create_tween()
+	var next_dot := [0.08]
 	tw.tween_method(func(t: float):
 		s.position = from.lerp(to, t) + Vector3(0, sin(t * PI) * arc, 0)
 		s.rotation.z = (-1.0 if s.flip_h else 1.0) * (0.5 - t) * 0.9
+		# Traînée en pointillés, comme les trajectoires dessinées en BD.
+		while t >= next_dot[0]:
+			_trail_dot(from.lerp(to, next_dot[0]) + Vector3(0, sin(next_dot[0] * PI) * arc, 0))
+			next_dot[0] += 0.09
 	, 0.0, 1.0, time)
 	await tw.finished
 	s.queue_free()
+
+
+static var _dot_mesh: SphereMesh
+
+func _trail_dot(pos: Vector3) -> void:
+	if _dot_mesh == null:
+		_dot_mesh = SphereMesh.new()
+		_dot_mesh.radius = 0.045
+		_dot_mesh.height = 0.09
+		_dot_mesh.radial_segments = 8
+		_dot_mesh.rings = 4
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = BD.INK
+		_dot_mesh.material = mat
+	var dot := MeshInstance3D.new()
+	dot.mesh = _dot_mesh
+	dot.position = pos
+	dot.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(dot)
+	var tw := create_tween()
+	tw.tween_interval(0.35)
+	tw.tween_property(dot, "scale", Vector3.ONE * 0.01, 0.3)
+	tw.tween_callback(dot.queue_free)
 
 
 ## Onomatopée dessinée qui surgit puis s'efface.

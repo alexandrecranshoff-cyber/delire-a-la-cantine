@@ -35,7 +35,7 @@ var _overlay_mesh := MultiMesh.new()
 var _cam_target := Vector3.ZERO
 var _cam_angle := 45.0
 var _cam_fixed := false           # contrôle visuel : la caméra reste sur la cible demandée
-var _cam_zoom := 24.0
+var _cam_zoom := 17.0   # assez près pour reconnaître les personnages ; molette jusqu'à 46
 var _panning := false
 var _rotating := false
 var _rotate_tween: Tween
@@ -184,8 +184,8 @@ func _setup_environment() -> void:
 	sun.light_energy = 0.46
 	sun.light_color = Color(1.0, 0.97, 0.9)
 	# Pas d'ombres calculées : celles des pions, des tables et des murs sont dessinées, comme
-	# en BD, et le rendu reste identique sur le web et sur PC. La version PC ajoute l'anticrénelage.
-	get_viewport().msaa_3d = Viewport.MSAA_4X if hd else Viewport.MSAA_DISABLED
+	# en BD, et le rendu reste identique sur le web et sur PC. Anticrénelage 2x sur le web, 4x sur PC.
+	get_viewport().msaa_3d = Viewport.MSAA_4X if hd else Viewport.MSAA_2X
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("amb="):
 			env.environment.ambient_light_energy = float(a.split("=")[1])
@@ -933,15 +933,17 @@ func _play_shot(e: Dictionary) -> void:
 		dest = pawns[victim.id].body_position()
 	elif state.board.is_table(landing):
 		dest.y = BoardView.TABLE_HEIGHT
-	await fx.throw_projectile(key, from, dest, clampf(0.28 + 0.035 * float(r["distance"]), 0.3, 0.75))
+	await fx.throw_projectile(key, from, dest, clampf(0.4 + 0.05 * float(r["distance"]), 0.45, 1.0))
 	var info := fx.impact_info(key)
-	fx.onomatopoeia(info[0], dest + Vector3(0, 0.9, 0), 1.5 if victim != null else 1.1)
+	# Au-dessus de la tête de la victime, pour ne pas cacher son nom ni sa jauge.
+	fx.onomatopoeia(info[0], dest + Vector3(0, 2.3 if victim != null else 0.9, 0), 1.5 if victim != null else 1.1)
 	Sound.play("splat_sol", 0.0)
 	if not state.board.is_table(landing):
 		fx.floor_stain(info[1], BoardView.cell_to_world(landing), info[2])
 	_shake = 0.12 if victim != null else 0.05
 
 	if victim == null:
+		fx.floating_text("RATÉ !", dest + Vector3(0, 1.0, 0), Color("d8d8e0"), 72)
 		hud.dice.add_text("La nourriture s'écrase par terre.", 22)
 		hud.log_line("%s rate %s." % [_who(shooter), _who(target_unit)])
 		await _wait(0.35 * pace)
@@ -1158,7 +1160,7 @@ func _refresh_all() -> void:
 	_refresh_fog()
 	var human_turn := human_teams.has(state.current_team) and not over
 	hud.set_status(state, human_turn)
-	hud.set_unit(selected, state.data.ap_per_turn())
+	hud.set_unit(selected, state.data.ap_per_turn(), "" if human_turn or over else BD.team_name(state.current_team))
 	var roster: Array = []
 	for u in state.units:
 		if u.team == viewer_team and u.kind != Unit.Kind.CART and (u.kind == Unit.Kind.STUDENT or u.is_on_board()):

@@ -13,6 +13,10 @@ const SOURCE_DIR := "res://assets/reference/animations/"
 const TARGET_DIR := "res://assets/animations/"
 const CLIPS := ["repos", "marche", "lancer", "touche"]
 const FPS := 20.0
+## Bras rabattus le long du corps (en degrés) : le repos de la bibliothèque garde les bras écartés
+## comme un mannequin. Appliqué au bras, à l'avant-bras et à la main, côté gauche et droit.
+const ARM_DROP := {"repos": 22.0}
+const ARM_BONES := ["Arm", "ForeArm", "Hand"]
 
 
 func _init() -> void:
@@ -29,7 +33,7 @@ func _init() -> void:
 		var mesh: MeshInstance3D = scene.find_children("*", "MeshInstance3D", true, false)[0]
 		var player: AnimationPlayer = scene.find_children("*", "AnimationPlayer", true, false)[0]
 		var source: Animation = player.get_animation(player.get_animation_list()[0])
-		var anim := _extract(source, skeleton, mesh.skin, clip == "marche")
+		var anim := _extract(source, skeleton, mesh.skin, clip == "marche", float(ARM_DROP.get(clip, 0.0)))
 		var err := ResourceSaver.save(anim, TARGET_DIR + clip + ".res", ResourceSaver.FLAG_COMPRESS)
 		print("%s : %.2f s, %d pistes (%s)" % [clip, anim.length, anim.get_track_count(), error_string(err)])
 		scene.free()
@@ -49,8 +53,15 @@ static func bind_globals(skeleton: Skeleton3D, skin: Skin) -> Dictionary:
 	return out
 
 
-func _extract(source: Animation, skeleton: Skeleton3D, skin: Skin, in_place: bool) -> Animation:
+func _extract(source: Animation, skeleton: Skeleton3D, skin: Skin, in_place: bool, arm_drop: float = 0.0) -> Animation:
 	var binds := bind_globals(skeleton, skin)
+	# Rotation qui rabat chaque bras vers le corps, autour de l'axe avant-arrière (Z) du squelette.
+	var drops := {}
+	if arm_drop != 0.0:
+		for side in ["Left", "Right"]:
+			var sign := -1.0 if side == "Left" else 1.0
+			for b in ARM_BONES:
+				drops[side + b] = Quaternion(Vector3(0, 0, 1), deg_to_rad(arm_drop) * sign)
 	var rot_tracks := {}
 	var pos_tracks := {}
 	for t in source.get_track_count():
@@ -93,6 +104,8 @@ func _extract(source: Animation, skeleton: Skeleton3D, skin: Skin, in_place: boo
 			globals[b] = g
 			if out_tracks.has(name):
 				var delta: Quaternion = (g * (binds[name]["rot"] as Quaternion).inverse()).normalized()
+				if drops.has(name):
+					delta = (drops[name] as Quaternion) * delta
 				anim.rotation_track_insert_key(out_tracks[name], time, delta)
 		var pos := root_bind
 		if pos_tracks.has(root):

@@ -17,8 +17,6 @@ var level: Level
 var _sides := {}               # "N" -> {"tall": Node3D, "low": Node3D, "lowered": bool}
 var _door_plates: Array = []   # [Label3D, côté]
 var _table_sets: Array[MultiMeshInstance3D] = []   # couverts : disparaissent quand les tables sont vides
-var _fog := MultiMeshInstance3D.new()
-var _fog_mesh := MultiMesh.new()
 var _cam_angle := 45.0
 var _rng := RandomNumberGenerator.new()
 
@@ -655,30 +653,46 @@ func face_camera(angle_deg: float) -> void:
 
 
 # --- Brouillard -------------------------------------------------------------------
+## Deux voiles (sol et dessus des tables) lisent la même carte de visibilité, un texel par case :
+## les bords sont adoucis par le filtrage au lieu de carrés durs.
+
+const FOG_SHADER := preload("res://shaders/brouillard.gdshader")
+
+var _fog_image: Image
+var _fog_texture: ImageTexture
+var _fog_planes: Array[MeshInstance3D] = []
+
 
 func _build_fog() -> void:
-	var quad := PlaneMesh.new()
-	quad.size = Vector2(1.0, 1.0)
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color = Color(0.08, 0.06, 0.14, 0.55)
-	quad.material = mat
-	_fog_mesh.transform_format = MultiMesh.TRANSFORM_3D
-	_fog_mesh.mesh = quad
-	_fog.multimesh = _fog_mesh
-	_fog.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(_fog)
+	_fog_image = Image.create(board.width, board.height, false, Image.FORMAT_RG8)
+	_fog_texture = ImageTexture.create_from_image(_fog_image)
+	for layer in 2:
+		var plane := PlaneMesh.new()
+		plane.size = Vector2(board.width, board.height)
+		var mat := ShaderMaterial.new()
+		mat.shader = FOG_SHADER
+		mat.set_shader_parameter("hidden_map", _fog_texture)
+		mat.set_shader_parameter("channel", layer)
+		mat.render_priority = 1
+		plane.material = mat
+		var mi := MeshInstance3D.new()
+		mi.mesh = plane
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var h := 0.035 if layer == 0 else TABLE_HEIGHT + 0.3
+		mi.position = Vector3(board.width / 2.0 - 0.5, h, board.height / 2.0 - 0.5)
+		add_child(mi)
+		_fog_planes.append(mi)
 
 
-## Grise les cases que la bande ne voit pas.
+## Voile les cases que la bande ne voit pas.
 func set_fog(cells: Array) -> void:
-	_fog_mesh.instance_count = cells.size()
-	for i in cells.size():
-		var c: Vector2i = cells[i]
-		var h := 0.03
-		if board.is_table(c):
-			h = TABLE_HEIGHT + 0.36
-		elif board.is_tub(c):
-			h = 1.2
-		_fog_mesh.set_instance_transform(i, Transform3D(Basis(), cell_to_world(c, h)))
+	_fog_image.fill(Color(0, 0, 0))
+	for c in cells:
+		var cell: Vector2i = c
+		if not board.in_bounds(cell):
+			continue
+		if board.is_table(cell):
+			_fog_image.set_pixel(cell.x, cell.y, Color(0, 1, 0))
+		else:
+			_fog_image.set_pixel(cell.x, cell.y, Color(1, 0, 0))
+	_fog_texture.update(_fog_image)
