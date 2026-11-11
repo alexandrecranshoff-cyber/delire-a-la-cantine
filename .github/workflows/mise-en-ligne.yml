@@ -43,3 +43,46 @@ jobs:
           protocol: ${{ vars.FTP_PROTOCOLE || 'ftps' }}
           local-dir: site/
           server-dir: ${{ vars.FTP_DOSSIER || 'htdocs/cantine/' }}
+
+  # Page de présentation (dossier site/ du dépôt) et versions PC à télécharger, à la racine du site
+  presentation:
+    needs: ftp
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            deploiement
+            site
+      - name: Récupérer les images et polices du site (Git LFS)
+        run: git lfs pull --include="site/**"
+      - name: Récupérer la version PC exportée
+        uses: actions/download-artifact@v4
+        with:
+          name: jeu-pc
+          path: pc
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Préparer le site
+        id: prep
+        env:
+          FTP_DOSSIER: ${{ vars.FTP_DOSSIER || 'htdocs/cantine/' }}
+        run: |
+          mkdir -p site/telecharger
+          (cd pc && chmod +x delire_a_la_cantine.x86_64 && zip -q -9 ../site/telecharger/delire_a_la_cantine_pc_windows.zip delire_a_la_cantine.exe && zip -q -9 ../site/telecharger/delire_a_la_cantine_pc_linux.zip delire_a_la_cantine.x86_64)
+          cp deploiement/htaccess-racine site/.htaccess
+          printf 'User-agent: *\nDisallow: /\n' > site/robots.txt
+          rm -f site/.gdignore
+          # Le site va dans le dossier parent de celui du jeu (FTP_DOSSIER sans « cantine/ »)
+          racine="${FTP_DOSSIER%cantine/}"
+          echo "dossier=${racine:-./}" >> "$GITHUB_OUTPUT"
+          ls -laR site | head -60
+      - name: Envoyer par FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVEUR }}
+          username: ${{ secrets.FTP_UTILISATEUR }}
+          password: ${{ secrets.FTP_MOT_DE_PASSE }}
+          protocol: ${{ vars.FTP_PROTOCOLE || 'ftps' }}
+          local-dir: site/
+          server-dir: ${{ steps.prep.outputs.dossier }}
