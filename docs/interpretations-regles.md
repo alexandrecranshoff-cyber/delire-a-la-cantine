@@ -33,6 +33,7 @@ Choix faits pour la version jouable du niveau 1. Les valeurs sont dans `data/reg
 | Neutres au tour 5 | Les neutres encore à table partent vers la porte la plus proche, 3 cases par tour de bande. | « déroulement de la partie » |
 | Berserk | À chaque tour de bande, il tire sur le pion visible le plus proche, quel qu'il soit, puis s'en rapproche. | « tire sur n'importe qui » |
 | Brouillard | Une bande voit ce que voient ses élèves ; seuls les murs cachent, comme ils arrêtent les tirs. | Game design. |
+| Tir hors de portée | On ne peut pas viser une cible plus loin que le plus haut total des dés d'adresse du tireur (distance + plus petite CX), ni un élève saturé. | Évite des tirs perdus d'avance ; relevé par l'essai de jeu. |
 | Difficulté du solo | Trois niveaux : fréquence des profs, moral de départ et finesse de l'adversaire. Aucun dé truqué. | Demande du 10 novembre 2026. |
 | Cases rouges | Les cases à portée d'un prof libre ou du cuisinier (son déplacement plus le contact) sont signalées. | Lisibilité : le joueur voit le risque avant de s'engager. |
 

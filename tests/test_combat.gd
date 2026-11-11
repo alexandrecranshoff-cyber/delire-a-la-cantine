@@ -135,3 +135,24 @@ func test_neutre_rallie_ne_compte_pas_pour_la_victoire() -> void:
 	n.team = 1
 	n.rallied = true
 	assert_eq(s.winner(), 0)
+
+
+func test_tir_hors_de_portee_des_des_refuse() -> void:
+	# Bigleux (1D+1) fait 7 au plus : une cible à 9 cases est hors de portée, même avec CX 0.
+	var s := make_state(ROOM, [1, 1, 1])
+	var a := s.add_student("Bigleux", 0, Vector2i(0, 1))
+	var loin := s.add_student("Ledur", 1, Vector2i(9, 1))
+	var pres := s.add_student("Grobill", 1, Vector2i(6, 1))
+	s.start_team_turn(0)
+	assert_eq(Combat.max_roll(a), 7)
+	assert_eq(Combat.cannot_shoot_reason(s, a, loin), "hors_de_portee")
+	assert_eq(Combat.cannot_shoot_reason(s, a, pres), "")
+
+
+func test_cible_saturee_refusee() -> void:
+	var s := make_state(ROOM, [1, 1, 1])
+	var a := s.add_student("Grobill", 0, Vector2i(0, 1))
+	var b := s.add_student("Ledur", 1, Vector2i(4, 1))
+	b.status = Unit.Status.SATURATED
+	s.start_team_turn(0)
+	assert_eq(Combat.cannot_shoot_reason(s, a, b), "cible_saturee")

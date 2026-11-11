@@ -46,6 +46,12 @@ var _stats := {}
 var hud_auto := false
 var _last_turn_shown := 0
 var _tables_stocked := true
+var _odds: Odds
+var _pushed_this_turn := {}       # id des élèves qui ont poussé un chariot ce tour (texte d'indice)
+var _skipping := false            # tour de l'ordinateur accéléré par le joueur
+var _advancing := false           # entre la fin du tour du joueur et son tour suivant
+const FAST_SPEED := 3.0
+const SKIP_SPEED := 8.0
 
 
 func _ready() -> void:
@@ -54,6 +60,7 @@ func _ready() -> void:
 	var s := GameConfig.seed_value if GameConfig.seed_value != 0 else int(Time.get_unix_time_from_system())
 	var ai: Array = [1] if GameConfig.solo else []
 	state = GameSetup.new_game(level, data, s, GameConfig.players, ai, GameConfig.difficulty if GameConfig.solo else "")
+	_odds = Odds.new(data)
 	if not GameConfig.solo:
 		state.options["prof_periode"] = int(GameSetup.difficulties()["normal"]["prof_periode"])
 	for a in OS.get_cmdline_user_args():
@@ -107,6 +114,7 @@ func _exit_tree() -> void:
 func _intro() -> void:
 	_last_turn_shown = 1
 	await hud.show_banner("À TABLE !", BD.YELLOW, "Tour 1 : %s" % BD.team_name(state.current_team).to_lower(), 1.0)
+	_end_skip()
 	if human_teams.size() > 1:
 		await hud.show_pass_screen(state.current_team)
 	busy = false
@@ -280,12 +288,29 @@ func _wait(seconds: float) -> void:
 
 func _set_fast(on: bool) -> void:
 	GameConfig.fast = on
-	Engine.time_scale = 2.2 if on else 1.0
+	_apply_speed()
+
+
+func _apply_speed() -> void:
+	Engine.time_scale = SKIP_SPEED if _skipping else (FAST_SPEED if GameConfig.fast else 1.0)
+
+
+## Clic ou Espace pendant le tour des autres : on joue la suite en accéléré.
+func _skip_others() -> void:
+	if _skipping or not _advancing or over:
+		return
+	_skipping = true
+	_apply_speed()
+	hud.set_hint("Accéléré jusqu'à ton tour…")
 
 
 # --- Entrées -----------------------------------------------------------------
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _advancing and ((event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT) \
+			or (event is InputEventKey and event.pressed and event.keycode == KEY_SPACE)):
+		_skip_others()
+		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
@@ -508,10 +533,14 @@ func _set_hovered(p: PawnView, text: String = "") -> void:
 		p.set_hover(true, text)
 
 
+func _hover_text(u: Unit) -> String:
+	return "%s  %d" % [u.name if u.kind == Unit.Kind.STUDENT else _who(u), u.moral]
+
+
 func _hover(c: Vector2i) -> void:
 	var target := _visible_unit_at(c)
 	if target != null and target.kind != Unit.Kind.CART:
-		_set_hovered(pawns[target.id], "%s  %d" % [target.name if target.kind == Unit.Kind.STUDENT else _who(target), target.moral])
+		_set_hovered(pawns[target.id], _hover_text(target))
 	else:
 		_set_hovered(null)
 	if selected == null:
@@ -536,7 +565,8 @@ func _hover(c: Vector2i) -> void:
 		var dist := Board.distance(selected.pos, target.pos)
 		if reason == "":
 			var what := "Arroser" if watering else "Lancer sur"
-			hud.set_hint("%s %s : distance %d, à battre %d + CX du projectile (%d PA)" % [what, _who(target), dist, dist, state.data.ap_cost("arrosage" if watering else "tir")])
+			var need := ("à battre %d" % (dist + Combat.min_cx(state, true))) if watering else ("à battre %d + CX du projectile" % dist)
+			hud.set_hint("%s %s : distance %d, %s (%d PA). Chances : %s" % [what, _who(target), dist, need, state.data.ap_cost("arrosage" if watering else "tir"), _chance_word(selected, dist)])
 		else:
 			hud.set_hint(_reason_text(reason))
 		return
@@ -560,7 +590,7 @@ func _hover(c: Vector2i) -> void:
 		if k != selected.pos:
 			# Vert : il restera de quoi tirer ; jaune : déplacement seul ; rouge : à portée d'un prof ou du cuisinier.
 			var keeps_shot: bool = not selected.has_shot and selected.ap - int(reach[k]) >= shot_cost
-			var color := Color(0.25, 0.95, 0.4, 0.42) if keeps_shot else Color(1.0, 0.85, 0.2, 0.36)
+			var color := Color(0.25, 0.95, 0.4, 0.58) if keeps_shot else Color(1.0, 0.85, 0.2, 0.52)
 			if threat.has(k):
 				color = Color(1.0, 0.25, 0.2, 0.5)
 			cells.append([k, color])
@@ -587,6 +617,8 @@ func _click(c: Vector2i) -> void:
 	if push_cart != null:
 		events = GameActions.push_cart(state, selected, push_cart, c)
 		push_cart = null
+		if not events.is_empty():
+			_pushed_this_turn[selected.id] = true
 		if events.is_empty():
 			_refresh_all()
 			return
@@ -664,6 +696,10 @@ func _end_turn() -> void:
 ## Termine le tour de la bande active puis enchaîne jusqu'au prochain joueur humain.
 func _advance() -> void:
 	busy = true
+	_advancing = true
+	_pushed_this_turn.clear()
+	_set_hovered(null)
+	hud.set_hint("Clic ou Espace : accélérer" if not opponents.is_empty() else "")
 	while true:
 		var events := TurnFlow.end_team_turn(state)
 		await _play(events)
@@ -684,6 +720,13 @@ func _advance() -> void:
 		_focus(pawns[selected.id].global_position)
 
 
+func _end_skip() -> void:
+	_advancing = false
+	_skipping = false
+	_apply_speed()
+	hud.set_hint("")
+
+
 func _ai_turn(bot: Opponent) -> void:
 	_refresh_all()
 	for guard in 200:
@@ -702,6 +745,7 @@ func _check_over() -> bool:
 		return false
 	over = true
 	busy = true
+	_end_skip()
 	_select(null)
 	_show_game_over(o)
 	return true
@@ -984,7 +1028,7 @@ func _play_shot(e: Dictionary) -> void:
 	else:
 		await hud.dice.roll(prefix, dmg, "= %d de moral" % dmg["total"], BD.YELLOW, 0.35 * pace)
 	fx.floating_text("-%d" % r["damage"], vp.head_position(), BD.YELLOW if r["damage"] < 10 else BD.RED, 84 if r["damage"] < 10 else 110)
-	hud.log_line("%s → %s : [b]-%d[/b] (%s)" % [_who(shooter), _who(victim), r["damage"], r["projectile_name"]])
+	hud.log_line("%s touche %s : [b]-%d[/b] (%s)" % [_who(shooter), _who(victim), r["damage"], r["projectile_name"]])
 	vp.refresh()
 	if r.get("saturated", false):
 		Sound.play("beurk")
@@ -1207,6 +1251,8 @@ func _refresh_fog() -> void:
 		var p: PawnView = pawns[id]
 		p.shown = Visibility.unit_visible(state, viewer_team, p.unit)
 		p.refresh()
+		if p == _hovered:
+			p.set_hover(true, _hover_text(p.unit))
 
 
 func _who(u: Unit) -> String:
@@ -1223,13 +1269,37 @@ func _who(u: Unit) -> String:
 	return "%s (%s)" % [u.name, BD.TEAM_NAMES[u.team % BD.TEAM_NAMES.size()]] if u.team >= 0 else u.name
 
 
+## Chance de toucher en mots (le joueur ne voit pas de pourcentage, seulement un ordre d'idée).
+func _chance_word(shooter: Unit, dist: int) -> String:
+	var p := 0.0
+	var pick := _odds.sum_distribution(2)
+	for roll in pick.keys():
+		var cx := int(state.data.projectile(str(roll))["cx"])
+		if watering:
+			cx = Combat.min_cx(state, true)
+		p += pick[roll] * _odds.chance_at_least(shooter.dex_d6, shooter.dex_bonus, dist + cx)
+	if p >= 0.85:
+		return "presque sûr"
+	if p >= 0.55:
+		return "bonnes"
+	if p >= 0.25:
+		return "moyennes"
+	return "faibles"
+
+
 func _reason_text(reason: String) -> String:
 	match reason:
-		"deja_tire": return "Déjà tiré ce tour."
-		"pas_assez_de_pa": return "Pas assez de PA pour tirer (4)."
+		"deja_tire":
+			if selected != null and _pushed_this_turn.has(selected.id):
+				return "Pas de tir après avoir poussé un chariot."
+			return "Déjà tiré ce tour."
+		"pas_assez_de_pa": return "Pas assez de PA pour tirer (%d)." % state.data.ap_cost("tir")
+		"cible_saturee": return "Déjà saturé : il file vers la sortie."
+		"hors_de_portee":
+			return "Hors de portée : %d au plus aux dés de %s." % [Combat.max_roll(selected), selected.name] if selected != null else "Hors de portée."
 		"pas_de_munitions": return "Pas de munition : va au contact d'une table garnie, d'un bac ou d'un chariot."
 		"mur": return "Un mur bloque la trajectoire."
-		"trop_loin": return "Trop loin pour arroser (5 cases max)."
+		"trop_loin": return "Trop loin pour arroser (%d cases max)." % int(state.data.projectile("robinet")["portee_max"])
 		"pas_de_robinet": return "Il faut être au contact d'un robinet pour arroser."
 		"ne_tire_pas": return "Ce personnage ne tire pas."
 		"cible_invalide": return "Cible impossible."

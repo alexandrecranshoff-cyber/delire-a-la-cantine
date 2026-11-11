@@ -111,15 +111,26 @@ func _build_top() -> void:
 	_speed_button.toggle_mode = true
 	_speed_button.tooltip_text = "Accélérer les animations et les dés (V)"
 	_speed_button.toggled.connect(func(on):
-		_speed_button.text = "VITESSE ×2" if on else "VITESSE ×1"
+		_speed_button.text = "VITESSE ×3" if on else "VITESSE ×1"
 		speed_toggled.emit(on))
 	row.add_child(_speed_button)
 	var help_btn := BD.sticker("?", Color("2f9e8f"), 22)
 	help_btn.tooltip_text = "Comment jouer (F1)"
 	help_btn.pressed.connect(toggle_help)
 	row.add_child(help_btn)
+	# Un premier clic demande confirmation : la partie en cours serait perdue.
 	var menu_btn := BD.sticker("MENU", Color("6b6b6b"), 20)
-	menu_btn.pressed.connect(func(): menu_pressed.emit())
+	menu_btn.tooltip_text = "Quitter la partie (deux clics)"
+	menu_btn.pressed.connect(func():
+		if menu_btn.text == "QUITTER ?":
+			menu_pressed.emit()
+			return
+		menu_btn.text = "QUITTER ?"
+		menu_btn.modulate = Color(1.3, 0.8, 0.8)
+		get_tree().create_timer(3.0, true, false, true).timeout.connect(func():
+			if is_instance_valid(menu_btn):
+				menu_btn.text = "MENU"
+				menu_btn.modulate = Color.WHITE))
 	row.add_child(menu_btn)
 	var pad2 := Control.new()
 	pad2.custom_minimum_size = Vector2(10, 0)
@@ -318,7 +329,7 @@ func _build_help() -> void:
 		"Neutre touché : sur 1 il te rejoint, sur 6 il devient berserk, sinon il s'enfuit.",
 		"Clic sur une table au contact pour grimper dessus (tout le tour). Clic sur un chariot au contact pour le pousser de 3 cases.",
 		"Caméra : clic droit pour tourner, Q et E par crans, molette pour zoomer, flèches ou clic molette pour se déplacer.",
-		"Entrée : fin du tour.  R : arroser au robinet.  P : projeter.  V : vitesse.  Échap : désélectionner.",
+		"Entrée : fin du tour.  R : arroser au robinet.  P : projeter.  V : vitesse.  Espace : accélérer le tour des autres.  Échap : désélectionner.",
 	]
 	for line in lines:
 		var l := BD.label("•  " + line, 25)
@@ -507,7 +518,7 @@ func set_actions(can_water: bool, can_project: bool, human_turn: bool) -> void:
 
 func set_fast(on: bool) -> void:
 	_speed_button.set_pressed_no_signal(on)
-	_speed_button.text = "VITESSE ×2" if on else "VITESSE ×1"
+	_speed_button.text = "VITESSE ×3" if on else "VITESSE ×1"
 
 
 func log_line(text: String) -> void:

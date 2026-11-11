@@ -7,6 +7,7 @@ const PAPER := Color("fbf6e6")
 const RED := Color("e23b30")
 const YELLOW := Color("ffd23c")
 const TEAM_COLORS: Array[Color] = [Color("e8433a"), Color("2f7fe6"), Color("36b25a"), Color("f0a020")]
+const TEACHER_COLOR := Color("8a3fd1")
 const TEAM_NAMES := ["rouge", "bleue", "verte", "jaune"]
 
 static var _fonts := {}

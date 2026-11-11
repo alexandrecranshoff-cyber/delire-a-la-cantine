@@ -332,8 +332,9 @@ func refresh() -> void:
 	_lift.scale = Vector3.ONE
 	_lift.rotation.z = 0.0
 	var team_col := BD.team_color(unit.team if (unit.kind == Unit.Kind.STUDENT or unit.rallied) else -1)
+	# Profs : violet, une couleur qu'aucune bande ne porte, pour les repérer d'un coup d'œil.
 	if unit.kind == Unit.Kind.TEACHER:
-		team_col = Color("8d8d8d")
+		team_col = BD.TEACHER_COLOR
 	elif unit.kind == Unit.Kind.COOK:
 		team_col = Color("ffffff")
 	_material.set_shader_parameter("border_color", team_col)
@@ -348,7 +349,8 @@ func refresh() -> void:
 		_rim.scale = Vector3(0.66, 1, 0.66) if neutral else Vector3.ONE
 		if neutral:
 			team_col = Color("b9b4c4")
-	_team_ring.visible = is_team and unit.kind != Unit.Kind.CART
+	var adult := unit.kind == Unit.Kind.TEACHER or unit.kind == Unit.Kind.COOK
+	_team_ring.visible = (is_team or adult) and unit.kind != Unit.Kind.CART
 	_team_ring_mat.albedo_color = Color(team_col, 0.85)
 	if _gauge_back_mat != null:
 		_gauge_back_mat.albedo_color = team_col.darkened(0.25) if is_team else BD.INK
