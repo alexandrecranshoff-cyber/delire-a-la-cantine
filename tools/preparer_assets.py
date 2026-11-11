@@ -485,6 +485,62 @@ def build_level_textures(rng):
     save_all(tiles, "textures", "mur_cuisine_pop80.png", hd_width=512)
 
 
+def build_chaotic_kitchen():
+    """Cuisine chaotique (niveau 3), d'après assets/reference/decors/cuisine_2_chaotique.png :
+    damier jaune et vert d'eau, sol jonché d'épluchures, faïence coulée de graisse et tuyau."""
+    rng = random.Random(1225)
+    floor = checker(8, 128, (232, 214, 120), (104, 176, 164), (52, 86, 84), rng,
+                    stains=[((140, 160, 50, 80), 10), ((120, 90, 40, 70), 8), ((200, 200, 210, 70), 4)])
+    fd = ImageDraw.Draw(floor, "RGBA")
+    for _ in range(70):  # épluchures, rondelles de carotte, miettes
+        x, y = rng.randrange(1024), rng.randrange(1024)
+        kind = rng.random()
+        if kind < 0.35:
+            r = rng.randrange(5, 9)
+            fd.ellipse((x - r, y - r, x + r, y + r), fill=(236, 120, 40), outline=INK, width=2)
+        elif kind < 0.7:
+            pts = [(x + rng.randrange(-14, 14), y + rng.randrange(-8, 8)) for _ in range(4)]
+            fd.line(pts, fill=(196, 160, 90), width=5)
+            fd.line(pts, fill=(*INK, 160), width=1)
+        else:
+            fd.polygon([(x, y), (x + rng.randrange(6, 14), y + 3), (x + 4, y + rng.randrange(6, 12))],
+                       fill=(110, 160, 60), outline=INK)
+    save_all(floor, "textures", "sol_cuisine_chaotique.png", hd_width=1024)
+
+    wall = Image.new("RGB", (512, 512), (52, 86, 84))
+    wd = ImageDraw.Draw(wall, "RGBA")
+    t = 32
+    for ty in range(0, 300 // t + 1):
+        for tx in range(512 // t):
+            col = (238, 222, 128) if (tx + ty) % 2 == 0 else (110, 184, 172)
+            k = rng.uniform(-8, 8)
+            col = tuple(int(max(0, min(255, c + k))) for c in col)
+            wd.rectangle((tx * t + 2, ty * t + 2, tx * t + t - 3, min(ty * t + t - 3, 296)), fill=col)
+    for _ in range(12):  # coulées de graisse depuis le haut
+        x, length = rng.randrange(512), rng.randrange(40, 160)
+        w = rng.randrange(4, 9)
+        wd.line((x, 0, x, length), fill=(150, 140, 60, 110), width=w)
+        wd.ellipse((x - w, length - w, x + w, length + w // 2), fill=(150, 140, 60, 110))
+    # Tuyau gris en travers, avec colliers.
+    wd.rectangle((0, 34, 512, 52), fill=(150, 156, 160))
+    wd.line((0, 34, 512, 34), fill=INK, width=3)
+    wd.line((0, 52, 512, 52), fill=INK, width=3)
+    wd.line((0, 39, 512, 39), fill=(220, 224, 226), width=2)
+    for x in range(40, 512, 128):
+        wd.rectangle((x, 30, x + 10, 56), fill=(110, 116, 120), outline=INK, width=2)
+    wd.rectangle((0, 296, 512, 470), fill=(92, 160, 150))
+    wd.line((0, 296, 512, 296), fill=INK, width=5)
+    for k in range(0, 513, 64):
+        wd.line((k, 296, k, 470), fill=(60, 112, 106), width=3)
+    for _ in range(9):  # éclaboussures sur le soubassement
+        x, y, r = rng.randrange(512), rng.randrange(310, 460), rng.randrange(6, 16)
+        wd.ellipse((x - r, y - r, x + r, y + r), fill=(140, 160, 50, 90))
+    wd.rectangle((0, 470, 512, 512), fill=(44, 60, 60))
+    wd.line((0, 470, 512, 470), fill=INK, width=4)
+    speckle(wall, rng, 360, [(0, 0, 0, 30), (255, 255, 255, 34), (110, 90, 40, 40)], (1, 3))
+    save_all(wall, "textures", "mur_cuisine_chaotique.png", hd_width=512)
+
+
 # --- Décor mural -----------------------------------------------------------------
 
 def build_decor():
@@ -509,6 +565,7 @@ def build_decor():
 BUILDERS = {
     "pions": build_pawns, "accessoires": build_props, "projectiles": build_projectiles,
     "effets": build_effects, "ecrans": build_screens, "textures": build_textures, "decor": build_decor,
+    "cuisine_chaotique": build_chaotic_kitchen,
 }
 
 if __name__ == "__main__":

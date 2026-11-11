@@ -29,6 +29,11 @@ func decor(part: String, fallback: String) -> String:
 	return str(raw.get("decor", {}).get(part, fallback))
 
 
+## Cuisine chaotique : le décor ajoute épluchures, marmites renversées et cagettes.
+func kitchen_mess() -> bool:
+	return bool(raw.get("cuisine_en_desordre", false))
+
+
 ## Réglages propres au niveau qui remplacent ceux de regles_video.json (voir GameState.options).
 func options() -> Dictionary:
 	return raw.get("options", {})

@@ -99,3 +99,12 @@ func test_habillage() -> void:
 		var decor: Dictionary = Level.load_file(path).raw.get("decor", {})
 		for k in decor.keys():
 			assert_true(ResourceLoader.exists("res://assets/sd/textures/" + str(decor[k])), str(decor[k]))
+
+
+func test_cuisine_chaotique_au_niveau_3() -> void:
+	var noel := Level.load_file(LEVELS[1])
+	assert_eq(noel.decor("sol_cuisine", "sol_cuisine.png"), "sol_cuisine_chaotique.png")
+	assert_eq(noel.decor("mur_cuisine", "mur_cuisine.png"), "mur_cuisine_chaotique.png")
+	assert_true(noel.kitchen_mess())
+	assert_false(Level.load_file(LEVELS[0]).kitchen_mess())
+	assert_false(Level.load_file("res://data/niveaux/niveau_1.json").kitchen_mess())
