@@ -381,6 +381,10 @@ func _process(delta: float) -> void:
 
 
 func _mouse_cell(screen: Vector2):
+	# Un personnage sous le curseur passe avant le décor : on vise son corps, pas ses pieds.
+	var pawn_cell = _pawn_under(screen)
+	if pawn_cell != null:
+		return pawn_cell
 	var origin := camera.project_ray_origin(screen)
 	var normal := camera.project_ray_normal(screen)
 	if absf(normal.y) < 0.001:
@@ -395,6 +399,26 @@ func _mouse_cell(screen: Vector2):
 		if state.board.in_bounds(c):
 			return c
 	return null
+
+
+## Case du pion dont la silhouette (des pieds à la tête, projetée à l'écran) est sous le curseur.
+## Le plus proche de la caméra gagne quand deux silhouettes se recouvrent.
+func _pawn_under(screen: Vector2):
+	var best = null
+	var best_depth := INF
+	for p: PawnView in pawns.values():
+		if not p.visible or not p.unit.is_on_board():
+			continue
+		var feet := camera.unproject_position(p.global_position)
+		var head := camera.unproject_position(p.head_position())
+		var half_w := maxf(10.0, absf(feet.y - head.y) * 0.28)
+		if screen.y < head.y - 4.0 or screen.y > feet.y + 6.0 or absf(screen.x - lerpf(feet.x, head.x, 0.5)) > half_w:
+			continue
+		var depth := camera.global_position.distance_to(p.global_position)
+		if depth < best_depth:
+			best_depth = depth
+			best = p.unit.pos
+	return best
 
 
 ## Amène la caméra sur un point s'il est hors du centre de l'écran (actions de l'ordinateur).

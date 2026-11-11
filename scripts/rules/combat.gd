@@ -76,7 +76,9 @@ static func resolve_shot(state: GameState, shooter: Unit, target: Unit, watering
 	var dmg := state.dice.roll_damage(proj["degats"])
 	report["damage_roll"] = dmg
 	report["damage"] = dmg["total"]
+	var before := victim.moral
 	report["saturated"] = state.apply_damage(victim, dmg["total"])
+	state.score_hit(shooter.team, victim, before - victim.moral)
 	report["neutral_reaction"] = NeutralReaction.NONE
 	if victim.kind == Unit.Kind.NEUTRAL and not report["saturated"] and victim.status == Unit.Status.ACTIVE:
 		report["neutral_reaction"] = neutral_hit(state, victim, shooter)
