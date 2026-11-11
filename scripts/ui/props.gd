@@ -293,6 +293,26 @@ static func counter(height: float) -> ArrayMesh:
 	)
 
 
+## Barre murale de cuisine avec louches, écumoires et poêles pendues. Origine au milieu de la barre.
+static func utensil_rail(length: float) -> ArrayMesh:
+	return _cached("ustensiles%.1f" % length, func(b: Builder):
+		b.box(Vector3(0, 0, 0.05), Vector3(length, 0.04, 0.04), Props.INOX_DARK, 0.01)
+		var n := maxi(3, int(length / 0.22))
+		for i in n:
+			var x := -length / 2.0 + length * (i + 0.5) / n
+			match i % 4:
+				0, 2:  # louche ou écumoire : manche et cuilleron
+					b.box(Vector3(x, -0.2, 0.07), Vector3(0.025, 0.38, 0.02), Props.INOX, 0.006)
+					b.cyl(Vector3(x, -0.46, 0.11), 0.07, 0.08, 0.06, Props.INOX if i % 4 == 0 else Props.INOX_DARK, 0.01, 8)
+				1:  # poêle noire
+					b.box(Vector3(x, -0.14, 0.07), Vector3(0.03, 0.26, 0.02), Color("2b2b33"))
+					b.cyl(Vector3(x, -0.46, 0.2), 0.15, 0.15, 0.04, Color("2b2b33"), 0.012, 12)
+				_:  # casserole cuivrée
+					b.box(Vector3(x, -0.12, 0.07), Vector3(0.03, 0.22, 0.02), Color("8a5a2b"))
+					b.cyl(Vector3(x, -0.4, 0.17), 0.12, 0.12, 0.05, Color("c8763a"), 0.012, 12)
+	)
+
+
 ## Étagère murale de cuisine avec casseroles. Origine au milieu, +Z vers la pièce.
 static func shelf(length: float) -> ArrayMesh:
 	return _cached("shelf%.1f" % length, func(b: Builder):

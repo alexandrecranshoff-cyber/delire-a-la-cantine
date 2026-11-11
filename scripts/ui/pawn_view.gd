@@ -42,6 +42,7 @@ var _bar_fill := MeshInstance3D.new()
 var _bar_mat := StandardMaterial3D.new()
 var _gauge_back_mat: StandardMaterial3D
 var _label := Label3D.new()
+var _cart_mat: StandardMaterial3D   # chariot : assombri quand il est dans le brouillard
 var _stains := Node3D.new()
 var _anim: AnimationPlayer
 var _is_model := false
@@ -119,6 +120,8 @@ func _setup_cart() -> void:
 	var food := Color("a5c94f") if unit.name.contains("pur") else Color("cf7a33")
 	var mi := MeshInstance3D.new()
 	mi.mesh = Props.cart(food)
+	_cart_mat = Props.material().duplicate()
+	mi.material_override = _cart_mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_body.add_child(mi)
 	_height = 1.05
@@ -373,6 +376,8 @@ func refresh() -> void:
 			_lift.scale = Vector3.ONE * 0.8
 			_lift.rotation.z = 0.5
 			position += Vector3(0.45, 0.0, 0.2)
+	if _cart_mat != null:
+		_cart_mat.albedo_color = Color.WHITE if shown else Color(0.5, 0.5, 0.58)
 	_material.set_shader_parameter("tint", tint)
 	_material.set_shader_parameter("tint_amount", amount)
 	var spent := unit.is_controllable() and unit.kind != Unit.Kind.CART and unit.ap <= 0 and unit.has_shot

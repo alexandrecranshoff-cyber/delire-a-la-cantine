@@ -590,7 +590,7 @@ func _hover(c: Vector2i) -> void:
 		if k != selected.pos:
 			# Vert : il restera de quoi tirer ; jaune : déplacement seul ; rouge : à portée d'un prof ou du cuisinier.
 			var keeps_shot: bool = not selected.has_shot and selected.ap - int(reach[k]) >= shot_cost
-			var color := Color(0.25, 0.95, 0.4, 0.58) if keeps_shot else Color(1.0, 0.85, 0.2, 0.52)
+			var color := Color(0.25, 0.95, 0.4, 0.46) if keeps_shot else Color(1.0, 0.85, 0.2, 0.44)
 			if threat.has(k):
 				color = Color(1.0, 0.25, 0.2, 0.5)
 			cells.append([k, color])

@@ -31,6 +31,7 @@ func build(p_board: Board, p_level: Level) -> void:
 		add_child(tall)
 		add_child(low)
 		_sides[key] = {"tall": tall, "low": low, "lowered": false}
+	_build_backdrop()
 	_build_floor()
 	_build_walls()
 	_build_wall_decor()
@@ -122,6 +123,23 @@ func _plate(text: String, pos: Vector3, color: Color, size: int = 64) -> Label3D
 
 
 # --- Sol ------------------------------------------------------------------------
+
+## Grand plan sous la salle, pour que le plateau ne flotte pas dans un aplat uni.
+func _build_backdrop() -> void:
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(board.width + 120, board.height + 120)
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/fond.gdshader")
+	var c := Vector3(board.width / 2.0 - 0.5, 0, board.height / 2.0 - 0.5)
+	mat.set_shader_parameter("center", c)
+	mat.set_shader_parameter("half_size", Vector2(board.width / 2.0 + 0.5, board.height / 2.0 + 0.5))
+	plane.material = mat
+	var mi := MeshInstance3D.new()
+	mi.mesh = plane
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = c + Vector3(0, -0.06, 0)
+	add_child(mi)
+
 
 func _build_floor() -> void:
 	var room := []
@@ -419,10 +437,18 @@ func _build_wall_decor() -> void:
 		for kz: float in range(split + 1, h - 1, 3):
 			if _wall_free(side, kz - 0.8, kz + 0.8):
 				_mesh_at(Props.shelf(1.8), _wall_point(side, kz, 1.5 if k % 2 == 0 else 1.95, 0.0), _wall_yaw(side), _sides[side]["tall"])
+			# Entre deux étagères : louches et poêles pendues à une barre.
+			if kz + 1.5 < h - 1 and _wall_free(side, kz + 0.9, kz + 2.1):
+				_mesh_at(Props.utensil_rail(1.1), _wall_point(side, kz + 1.5, 1.95 if k % 2 == 0 else 1.55, 0.0), _wall_yaw(side), _sides[side]["tall"])
 			k += 1
 	for x in [5.0, 10.0, w - 11.0, w - 6.0]:
 		if _wall_free("S", x - 1.5, x + 1.5):
 			_mesh_at(Props.shelf(3.0), _wall_point("S", x, 1.5, 0.0), _wall_yaw("S"), _sides["S"]["tall"])
+			_mesh_at(Props.shelf(3.0), _wall_point("S", x, 2.05, 0.0), _wall_yaw("S"), _sides["S"]["tall"])
+	for x in [7.5, w - 8.5, mid]:
+		if _wall_free("S", x - 0.7, x + 0.7):
+			_mesh_at(Props.utensil_rail(1.3), _wall_point("S", x, 1.8, 0.0), _wall_yaw("S"), _sides["S"]["tall"])
+
 
 
 # --- Tables -----------------------------------------------------------------------
@@ -516,9 +542,20 @@ func _build_tables() -> void:
 		index += 1
 	_multimesh(_box(Vector3(0.09, TABLE_HEIGHT - 0.1, 0.09), _tiled("inox.png", Vector3(1, 1, 1))), legs)
 	for v in 3:
+		# Ordre mélangé : les plateaux qui restent après le tour 4 se répartissent sur toutes les tables.
+		_shuffle(trays[v])
 		_table_sets.append(_multimesh(Props.tray(v), trays[v], false))
+	_shuffle(pitchers)
 	_table_sets.append(_multimesh(Props.pitcher(), pitchers, false))
 	_table_sets.append(_multimesh(Props.basket(), baskets, false))
+
+
+func _shuffle(list: Array) -> void:
+	for i in range(list.size() - 1, 0, -1):
+		var j := _rng.randi_range(0, i)
+		var t = list[i]
+		list[i] = list[j]
+		list[j] = t
 
 
 ## Les tables se vident à la fin du tour 4 (livret) : plus de couverts, plus de munitions.
