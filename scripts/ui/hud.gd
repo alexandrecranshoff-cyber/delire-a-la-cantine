@@ -10,6 +10,7 @@ signal project_pressed
 signal unit_picked(id: int)
 signal menu_pressed
 signal replay_pressed
+signal campaign_pressed
 signal speed_toggled(fast: bool)
 signal save_pressed
 
@@ -633,7 +634,7 @@ func show_pass_screen(team: int) -> void:
 
 
 ## Bulletin de fin de partie.
-func show_game_over(title: String, color: Color, intro: String, teams: Array, rows: Array, comment: String) -> void:
+func show_game_over(title: String, color: Color, intro: String, teams: Array, rows: Array, comment: String, campaign: bool = false) -> void:
 	var bg := _dim_overlay()
 	var sheet := BD.paper_panel(30)
 	sheet.set_anchors_preset(Control.PRESET_CENTER)
@@ -679,9 +680,14 @@ func show_game_over(title: String, color: Color, intro: String, teams: Array, ro
 	row.add_theme_constant_override("separation", 20)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(row)
-	var again := BD.sticker("REJOUER", BD.RED, 40)
-	again.pressed.connect(func(): replay_pressed.emit())
-	row.add_child(again)
+	if campaign:
+		var next := BD.sticker("SUITE DE L'ANNÉE", BD.RED, 40)
+		next.pressed.connect(func(): campaign_pressed.emit())
+		row.add_child(next)
+	else:
+		var again := BD.sticker("REJOUER", BD.RED, 40)
+		again.pressed.connect(func(): replay_pressed.emit())
+		row.add_child(again)
 	var menu := BD.sticker("MENU", Color("6b6b6b"), 40)
 	menu.pressed.connect(func(): menu_pressed.emit())
 	row.add_child(menu)

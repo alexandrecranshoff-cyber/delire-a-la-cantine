@@ -5,8 +5,8 @@ extends Node3D
 
 signal back_to_menu
 signal replay
+signal campaign_next   # fin d'un service de l'année scolaire : retour à l'écran de l'année
 
-const LEVEL_PATH := "res://data/niveaux/niveau_1.json"
 const STEP_TIME := 0.085
 const ROTATE_STEP := 45.0
 const ROTATE_DRAG_SPEED := 0.4  # degrés par pixel
@@ -58,6 +58,10 @@ var _seed := 0
 var _save_panel: SavePanel
 var _skipping := false            # tour de l'ordinateur accéléré par le joueur
 var _advancing := false           # entre la fin du tour du joueur et son tour suivant
+var _year: Campaign               # année scolaire en cours (partie lancée depuis l'écran de l'année)
+var _service := {}                # service de l'année joué
+var _level_path := ""
+var _unit_stats := {}             # id -> {"touches", "satures"} : expérience de fin de service
 const FAST_SPEED := 3.0
 const SKIP_SPEED := 8.0
 const OTHERS_SPEED := 1.5
@@ -65,7 +69,6 @@ const OTHERS_SPEED := 1.5
 
 func _ready() -> void:
 	var data := GameData.load_default()
-	level = Level.load_file(LEVEL_PATH)
 	var s := GameConfig.seed_value if GameConfig.seed_value != 0 else int(Time.get_unix_time_from_system())
 	_resume = GameConfig.pending_load
 	GameConfig.pending_load = {}
@@ -74,10 +77,29 @@ func _ready() -> void:
 		GameConfig.solo = bool(cfg["solo"])
 		GameConfig.difficulty = str(cfg["difficulty"])
 		GameConfig.players = int(cfg["players"])
+		GameConfig.level_path = str(cfg.get("level", "res://data/niveaux/niveau_1.json"))
+		GameConfig.campaign = bool(cfg.get("campaign", false))
 		s = int(str(cfg["seed"]))
 	_seed = s
+	var level_path := GameConfig.level_path
+	if GameConfig.campaign:
+		_year = CampaignStore.load_year()
+		if _year == null:
+			GameConfig.campaign = false
+		else:
+			_service = _year.current_service()
+			if not _resume.is_empty():
+				_service = _year.service_by_id(str(_resume["config"].get("service", _service["id"])))
+			level_path = Campaign.level_path(_service)
+			GameConfig.solo = true
+			GameConfig.players = 2
+			GameConfig.difficulty = _year.difficulty()
+	level = Level.load_file(level_path)
+	_level_path = level_path
 	var ai: Array = [1] if GameConfig.solo else []
 	state = GameSetup.new_game(level, data, s, GameConfig.players, ai, GameConfig.difficulty if GameConfig.solo else "")
+	if _year != null:
+		_year.prepare_state(state, 0, _service)
 	_odds = Odds.new(data)
 	if not GameConfig.solo:
 		state.options["prof_periode"] = int(GameSetup.difficulties()["normal"]["prof_periode"])
@@ -98,6 +120,9 @@ func _ready() -> void:
 		if saved_stats.has(str(t)):
 			for k in _stats[t].keys():
 				_stats[t][k] = int(saved_stats[str(t)].get(k, 0))
+	var saved_units: Dictionary = _resume.get("unit_stats", {})
+	for k in saved_units.keys():
+		_unit_stats[int(k)] = {"touches": int(saved_units[k]["touches"]), "satures": int(saved_units[k]["satures"])}
 	viewer_team = human_teams[0] if not human_teams.is_empty() else 0
 	if not _resume.is_empty() and human_teams.has(state.current_team):
 		viewer_team = state.current_team
@@ -122,11 +147,17 @@ func _ready() -> void:
 	hud.unit_picked.connect(func(id): _pick(state.get_unit(id)))
 	hud.menu_pressed.connect(func(): back_to_menu.emit())
 	hud.replay_pressed.connect(func(): replay.emit())
+	hud.campaign_pressed.connect(func(): campaign_next.emit())
 	hud.speed_toggled.connect(_set_fast)
 	hud.save_pressed.connect(_open_save_panel)
 	hud.set_fast(GameConfig.fast)
 	_set_fast(GameConfig.fast)
-	hud.log_line("[b]Service de midi.[/b] Graine des dés : %d." % s)
+	var where := ("%s, « %s »" % [_service["mois"], _service["titre"]]) if _year != null else level.name
+	hud.log_line("[b]Service de midi : %s.[/b] Graine des dés : %d." % [where, s])
+	if level.menu_name() != "":
+		hud.log_line("Menu du jour : %s." % level.menu_name().to_lower())
+	if not state.board.cells_of(Board.Terrain.PUDDLE).is_empty():
+		hud.log_line("Le toit fuit : une case de flaque coûte %d PA." % int(state.data.rules["points_action"]["flaque"]))
 	Sound.music("musique_partie")
 	Sound.ambience(true)
 	_update_camera()
@@ -655,6 +686,8 @@ func _hover(c: Vector2i) -> void:
 		for p in Movement.path_to(state, selected, c):
 			cells.append([p, Color(0.1, 0.6, 1.0, 0.95)])
 		var warn := "  Attention : à portée d'un prof ou du cuisinier !" if threat.has(c) else ""
+		if state.board.is_puddle(c):
+			warn = "  Flaque : %d PA la case." % int(state.data.rules["points_action"]["flaque"]) + warn
 		hud.set_hint("Aller ici : %d PA (il en restera %d).%s" % [reach[c], selected.ap - reach[c], warn])
 	else:
 		hud.set_hint("%s : %d PA" % [selected.name, selected.ap])
@@ -799,10 +832,20 @@ func _save_entry() -> Dictionary:
 	var now := Time.get_datetime_dict_from_system()
 	return {
 		"date": "%02d/%02d à %02dh%02d" % [now["day"], now["month"], now["hour"], now["minute"]],
-		"config": {"solo": GameConfig.solo, "difficulty": GameConfig.difficulty, "players": GameConfig.players, "seed": str(_seed)},
+		"config": {"solo": GameConfig.solo, "difficulty": GameConfig.difficulty, "players": GameConfig.players, "seed": str(_seed),
+			"level": _level_path,
+			"campaign": _year != null, "service": str(_service.get("id", "")), "level_name": level.name},
 		"stats": stats,
+		"unit_stats": _unit_stats_dict(),
 		"state": SaveGame.to_dict(state),
 	}
+
+
+func _unit_stats_dict() -> Dictionary:
+	var out := {}
+	for id in _unit_stats.keys():
+		out[str(id)] = _unit_stats[id].duplicate()
+	return out
 
 
 ## Début de chaque tour du joueur : la reprise automatique suit la partie.
@@ -890,12 +933,39 @@ func _show_game_over(o: Dictionary) -> void:
 	var comment := ""
 	if GameConfig.solo:
 		comment = "Difficulté « %s ». Appréciation : %s" % [GameSetup.difficulties()[GameConfig.difficulty]["nom"], _appreciation(won)]
+	if _year != null:
+		comment = _finish_service(won) + "  " + comment
 	Sound.ambience(false)
 	if o["reason"] == "sonnerie":
 		Sound.play("sonnerie")
 		await hud.show_banner("DRIIIING !", BD.YELLOW, "Fin du service", 1.2)
 	Sound.play("victoire" if won else "defaite")
-	hud.show_game_over(title, color, intro, teams, rows, comment)
+	hud.show_game_over(title, color, intro, teams, rows, comment, _year != null)
+
+
+## Fin d'un service de l'année : expérience de chaque élève de la bande, colles, mois suivant.
+func _finish_service(won: bool) -> String:
+	var team: int = human_teams[0]
+	var results := {}
+	for u in state.units:
+		if u.kind == Unit.Kind.STUDENT and u.team == team and not u.rallied:
+			var st: Dictionary = _unit_stats.get(u.id, {"touches": 0, "satures": 0})
+			results[u.name] = {"touches": int(st["touches"]), "satures": int(st["satures"]), "fin": Campaign.end_status(u)}
+	var was_done: bool = _year.progress["termine"]
+	var gains := _year.finish_service(str(_service["id"]), results, won, int(state.chahut.get(team, 0)))
+	CampaignStore.save_year(_year)
+	SaveSlots.erase("auto")  # le service est fini : plus rien à reprendre
+	GameConfig.last_gains = {"gagne": won, "eleves": gains}
+	GameConfig.show_bulletin = won and not was_done and _year.progress["termine"]
+	var total := 0
+	var colles := 0
+	for k in gains.keys():
+		total += int(gains[k]["xp"])
+		colles += 1 if gains[k]["colle"] else 0
+	var text := "Année scolaire : %d points d'expérience pour la bande" % total
+	if colles > 0:
+		text += ", %d élève%s collé%s pour le prochain service" % [colles, "s" if colles > 1 else "", "s" if colles > 1 else ""]
+	return text + "."
 
 
 func _appreciation(won: bool) -> String:
@@ -1088,7 +1158,7 @@ func _play_shot(e: Dictionary) -> void:
 	var pace := 1.0 if by_human else 0.7
 	hud.dice.clear()
 	hud.dice.add_text("%s vise %s à %d case%s." % [_who(shooter), _who(target_unit), r["distance"], "s" if r["distance"] > 1 else ""], 22)
-	var key: String = r["projectile"]
+	var key: String = str(state.data.projectiles.get(r["projectile"], {}).get("image", r["projectile"]))
 	if r.has("projectile_roll"):
 		var pr: Dictionary = r["projectile_roll"]
 		await hud.dice.roll("Projectile", pr, "= %d : %s (CX %d)" % [pr["total"], r["projectile_name"], r["cx"]], Color.WHITE, 0.4 * pace)
@@ -1156,6 +1226,12 @@ func _play_shot(e: Dictionary) -> void:
 
 
 func _stats_shot(shooter: Unit, r: Dictionary, victim: Unit) -> void:
+	if not _unit_stats.has(shooter.id):
+		_unit_stats[shooter.id] = {"touches": 0, "satures": 0}
+	if r["hit"] and victim != null and victim.team != shooter.team:
+		_unit_stats[shooter.id]["touches"] += 1
+	if victim != null and r.get("saturated", false) and victim.team != shooter.team:
+		_unit_stats[shooter.id]["satures"] += 1
 	if not _stats.has(shooter.team):
 		return
 	_stats[shooter.team]["tirs"] += 1
@@ -1336,7 +1412,7 @@ func _refresh_all() -> void:
 	_refresh_fog()
 	var human_turn := human_teams.has(state.current_team) and not over
 	hud.set_status(state, human_turn)
-	hud.set_unit(selected, state.data.ap_per_turn(), "" if human_turn or over else BD.team_name(state.current_team))
+	hud.set_unit(selected, state.max_ap(selected) if selected != null else state.data.ap_per_turn(), "" if human_turn or over else BD.team_name(state.current_team))
 	var roster: Array = []
 	for u in state.units:
 		if u.team == viewer_team and u.kind != Unit.Kind.CART and (u.kind == Unit.Kind.STUDENT or u.is_on_board()):

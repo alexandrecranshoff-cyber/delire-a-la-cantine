@@ -6,7 +6,8 @@
     "tir": 4,
     "arrosage": 4,
     "pousser_chariot": 4,
-    "projection": 4
+    "projection": 4,
+    "flaque": 2
   },
   "chariot_cases_max": 3,
   "tours_munitions_tables": 4,
@@ -30,5 +31,5 @@
   "tours_max": 8,
   "prof_periode": 2,
   "adultes_par_manche": 1,
-  "_note_ajouts": "tours_max : la sonnerie met fin au service (ajout vidéo). prof_periode : un prof entre tous les N tours de bande (livret : 1). pa_neutre_rallie : 3 cases + un tir. adultes_par_manche : 1 = profs et cuisinier agissent une fois par manche (après la dernière bande), 0 = après chaque bande comme dans le livret."
+  "_note_ajouts": "points_action.flaque : PA pour entrer sur une flaque (niveau 3). tours_max : la sonnerie met fin au service (ajout vidéo). prof_periode : un prof entre tous les N tours de bande (livret : 1). pa_neutre_rallie : 3 cases + un tir. adultes_par_manche : 1 = profs et cuisinier agissent une fois par manche (après la dernière bande), 0 = après chaque bande comme dans le livret."
 }

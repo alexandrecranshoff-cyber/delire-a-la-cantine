@@ -57,7 +57,7 @@ func _next_unit(state: GameState) -> Unit:
 func _act(state: GameState, u: Unit) -> Array:
 	if u.on_table:
 		_done[u.id] = true
-		if u.ap == state.data.ap_per_turn():
+		if u.ap == state.max_ap(u):
 			for n in Board.neighbors8(u.pos):
 				if Movement.can_descend(state, u, n):
 					return GameActions.descend(state, u, n)

@@ -8,7 +8,7 @@ extends RefCounted
 const VERSION := 1
 
 const UNIT_FIELDS := ["id", "kind", "name", "team", "status", "moral", "max_moral", "dex_d6", "dex_bonus",
-	"ap", "has_shot", "on_table", "turns_on_table", "loaded", "rallied", "captor_id"]
+	"ap", "ap_bonus", "has_shot", "on_table", "turns_on_table", "loaded", "rallied", "captor_id"]
 
 
 static func to_dict(state: GameState) -> Dictionary:
@@ -67,7 +67,7 @@ static func apply(state: GameState, d: Dictionary) -> bool:
 	for ud in d["units"]:
 		var u := Unit.new()
 		for f in UNIT_FIELDS:
-			var v = ud[f]
+			var v = ud.get(f, u.get(f))  # champ absent des anciennes sauvegardes : valeur par défaut
 			if f == "name":
 				u.set(f, str(v))
 			elif typeof(u.get(f)) == TYPE_BOOL:

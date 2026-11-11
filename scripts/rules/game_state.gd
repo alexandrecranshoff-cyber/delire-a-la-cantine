@@ -16,7 +16,8 @@ var doors: Dictionary = {}
 var team_turns_done := 0
 var teachers_spawned := 0
 var cook_awake := false
-## Réglages de la partie (difficulté) qui remplacent ceux de regles_video.json : "prof_periode", "tours_max".
+## Réglages de la partie (difficulté, service de l'année) qui remplacent ceux de regles_video.json :
+## "prof_periode", "tours_max", "tours_munitions_tables".
 var options: Dictionary = {}
 ## Bandes jouées par l'ordinateur (numéros).
 var ai_teams: Array[int] = []
@@ -91,7 +92,7 @@ func team_units(team: int) -> Array[Unit]:
 
 
 func tables_have_ammo() -> bool:
-	return turn <= int(data.rules["tours_munitions_tables"])
+	return turn <= option("tours_munitions_tables")
 
 
 ## Cases où l'on prend des munitions : bacs (sauf vaisselle) et chariots.
@@ -149,11 +150,19 @@ func start_team_turn(team: int) -> void:
 	for u in units:
 		if u.team != team or not u.is_on_board():
 			continue
-		u.ap = data.ap_per_turn() if u.kind == Unit.Kind.STUDENT else int(data.rules["pa_neutre_rallie"])
+		u.ap = max_ap(u)
 		u.has_shot = false
 		if u.on_table:
 			u.turns_on_table += 1
 		refresh_loaded(u)
+
+
+## PA d'un pion au début de son tour : 12 pour un élève (plus ses PA gagnés en campagne),
+## 7 pour un neutre rallié.
+func max_ap(u: Unit) -> int:
+	if u.kind == Unit.Kind.STUDENT:
+		return data.ap_per_turn() + u.ap_bonus
+	return int(data.rules["pa_neutre_rallie"])
 
 
 ## Élève obligé de descendre (temps maximum sur une table écoulé).

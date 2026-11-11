@@ -3,7 +3,8 @@ extends RefCounted
 ## Grille du plateau : terrain seulement (les pions sont dans GameState).
 ## Coordonnées : x vers la droite, y vers le bas.
 
-enum Terrain { FLOOR, KITCHEN, WALL, TABLE, DOOR, TAP, TUB, DISH_TUB }
+## PUDDLE : flaque d'eau sur le sol de la salle (ajout vidéo, niveau « Repas de Noël ») : on y marche, plus lentement.
+enum Terrain { FLOOR, KITCHEN, WALL, TABLE, DOOR, TAP, TUB, DISH_TUB, PUDDLE }
 
 ## Légende des plans en texte (niveaux et tests).
 const SYMBOLS := {
@@ -15,6 +16,7 @@ const SYMBOLS := {
 	"R": Terrain.TAP,
 	"B": Terrain.TUB,
 	"V": Terrain.DISH_TUB,
+	"~": Terrain.PUDDLE,
 }
 
 ## Les 8 directions dans l'ordre de rotation vers la gauche (haut, haut-gauche, gauche…).
@@ -59,7 +61,11 @@ func terrain(c: Vector2i) -> Terrain:
 ## Case de sol où l'on marche (salle, cuisine, porte).
 func is_ground(c: Vector2i) -> bool:
 	var t := terrain(c)
-	return t == Terrain.FLOOR or t == Terrain.KITCHEN or t == Terrain.DOOR
+	return t == Terrain.FLOOR or t == Terrain.KITCHEN or t == Terrain.DOOR or t == Terrain.PUDDLE
+
+
+func is_puddle(c: Vector2i) -> bool:
+	return terrain(c) == Terrain.PUDDLE
 
 
 func is_table(c: Vector2i) -> bool:

@@ -37,3 +37,18 @@ Choix faits pour la version jouable du niveau 1. Les valeurs sont dans `data/reg
 | Difficulté du solo | Trois niveaux : fréquence des profs, moral de départ et finesse de l'adversaire. Aucun dé truqué. | Demande du 10 novembre 2026. |
 | Cases rouges | Les cases à portée d'un prof libre ou du cuisinier (son déplacement plus le contact) sont signalées. | Lisibilité : le joueur voit le risque avant de s'engager. |
 
+
+## Année scolaire et nouveaux niveaux
+
+Ajouts du 11 novembre 2026 (campagne solo, services de novembre et de décembre). Valeurs dans `data/campagne.json`, `data/regles_video.json` et `data/niveaux/niveau_2.json`, `niveau_3.json` ; tests dans `tests/test_campaign.gd` et `tests/test_niveaux_2_3.gd`.
+
+| Sujet | Choix | Pourquoi |
+| --- | --- | --- |
+| Année scolaire | Un service par mois, dans l'ordre. Gagner ouvre le mois suivant ; perdre fait refaire le service, en gardant les points gagnés. Septembre, novembre et décembre sont jouables ; février, avril et juin sont annoncés. Bulletin à la fin de décembre (premier trimestre). | Game design : « une année scolaire, avec expérience et difficulté croissante ». |
+| Expérience | Par élève : 1 point par tir réussi sur un adversaire, 3 par adversaire saturé, 2 s'il est encore à table à la fin, 2 si la bande gagne. | Récompense le jeu actif sans punir le perdant. |
+| Améliorations | Moral +10 (4 points, 3 fois), adresse (6 points : +1 au jet, puis un dé de plus), +1 PA par tour (8 points, 2 fois). | GDD : « moral maximum, dextérité (un bonus de +1, puis un dé de plus) ou points d'action ». |
+| Élève collé | Emmené par un prof ou plongé dans un bac : il commence le service suivant à 70 % de son moral. Personne n'est perdu. | GDD : « conséquences légères ». |
+| Difficulté croissante | La difficulté choisie pour l'année s'applique à chaque service, plus la pression du mois : novembre +10 % de moral adverse ; décembre +20 %, profs plus fréquents, tables garnies 3 tours au lieu de 4. | Monter la pression sans truquer les dés. |
+| Menu du jour | Un niveau peut remplacer des lignes de la table des projectiles (même clé 2D6), avec un dessin par plat. Novembre : poisson pané, épinards, semoule, brandade. Décembre : dinde aux marrons, bûche de Noël. | GDD : « le menu du jour change la table des projectiles ». Chiffres proches de la ligne remplacée. |
+| Tables en long (novembre) | 8 tables de 3 × 10 en deux rangées, allée centrale ; un troisième chariot (poisson) reste dans l'allée. | Donne des couloirs de tir et une réserve de munitions hors de la cuisine après le tour 4. |
+| Flaques (décembre) | Case de sol « ~ » : on y marche pour 2 PA au lieu de 1 (`points_action.flaque`). Les chariots et les élèves debout sur une table ne sont pas ralentis, ni les pions automatiques (profs, neutres). Les flaques n'arrêtent ni la vue ni les tirs. Les places assises restent sèches. | Une particularité simple, lisible à l'écran et sans dé. Le chemin proposé est le moins coûteux, pas le plus court. |

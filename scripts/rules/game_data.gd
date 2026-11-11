@@ -50,3 +50,12 @@ func roll_threshold(key: String) -> int:
 
 func projectile(key: String) -> Dictionary:
 	return projectiles[key]
+
+
+## Menu du jour d'un niveau : remplace des lignes de la table des projectiles (même clé 2D6).
+## Chaque plat garde le format de projectiles.json, avec en plus « image » (dessin du projectile).
+func apply_menu(dishes: Dictionary) -> void:
+	for key in dishes.keys():
+		if str(key).begins_with("_"):
+			continue
+		projectiles[str(key)] = dishes[key]
