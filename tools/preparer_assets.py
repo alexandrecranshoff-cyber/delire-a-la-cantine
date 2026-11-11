@@ -186,6 +186,16 @@ def build_projectiles():
             img = d.crop_component(sheet, labels, box)
             save_all(img, "projectiles", f"projectile_{keys[r][c]}.png", hd_height=192)
     print("projectiles", len(boxes))
+    # Plats des menus du jour (niveaux 2 et 3) : planche de 4 x 3, on garde six dessins.
+    rgb = d.load_rgb(REF / "elements" / "projectiles_menus.png")
+    sheet = d.cutout(rgb)
+    boxes, labels = d.components(sheet, merge=22, min_area=6000)
+    wanted = {"poisson": (0, 0), "epinards": (1, 0), "semoule": (2, 0), "brandade": (0, 1), "dinde": (1, 1), "buche": (3, 1)}
+    for name, (c, r) in wanted.items():
+        box = pick(boxes, 2752 * (c + 0.5) / 4, 1536 * (r + 0.5) / 3)
+        img = d.crop_component(sheet, labels, box)
+        save_all(img, "projectiles", f"projectile_{name}.png", hd_height=192)
+    print("projectiles des menus", len(boxes))
 
 
 def build_effects():
@@ -371,7 +381,108 @@ def build_textures():
         pd.line((0, k, 256, k), fill=(120, 160, 200, 170), width=2)
     speckle(paper, rng, 160, [(120, 100, 60, 16)], (1, 4))
     save_all(paper, "textures", "papier.png", hd_width=256)
+    build_level_textures(rng)
     print("textures")
+
+
+def peel(img, rng, count, color, size):
+    """Plâtre écaillé : taches claires irrégulières cernées d'encre (mur de la cantine crade)."""
+    draw = ImageDraw.Draw(img, "RGBA")
+    for _ in range(count):
+        x, y = rng.randrange(img.width), rng.randrange(int(img.height * 0.55))
+        pts = []
+        n = rng.randrange(6, 10)
+        r0 = rng.uniform(*size)
+        for k in range(n):
+            a = 2 * 3.14159 * k / n
+            r = r0 * rng.uniform(0.55, 1.15)
+            pts.append((x + r * np.cos(a) * 1.4, y + r * np.sin(a)))
+        draw.polygon(pts, fill=color, outline=(*INK, 150))
+
+
+def zigzag(draw, y, width, color, amp, step, line_width):
+    pts = [(x, y + (amp if (x // step) % 2 else -amp)) for x in range(0, width + step, step)]
+    draw.line(pts, fill=color, width=line_width)
+
+
+def build_level_textures(rng):
+    """Habillages des niveaux 2 et 3 (data/niveaux/*.json, clé « decor »), d'après les visuels
+    assets/reference/decors/cantine_2_crade.png et cuisine_3_pop80.png."""
+    # Cantine crade : damier turquoise passé et crème jauni, fêlures, auréoles et traces.
+    floor = checker(8, 128, (96, 160, 150), (226, 218, 184), (58, 84, 82), rng,
+                    stains=[((120, 96, 50, 70), 14), ((90, 110, 60, 50), 6), ((60, 50, 40, 50), 6)])
+    fd = ImageDraw.Draw(floor, "RGBA")
+    for _ in range(26):  # fêlures supplémentaires
+        x, y = rng.randrange(1024), rng.randrange(1024)
+        pts = [(x, y)]
+        for _ in range(rng.randrange(2, 5)):
+            x += rng.randrange(-40, 40)
+            y += rng.randrange(-40, 40)
+            pts.append((x, y))
+        fd.line(pts, fill=(*INK, 120), width=2)
+    save_all(floor, "textures", "sol_salle_crade.png", hd_width=1024)
+
+    # Mur crade : moutarde délavée, plâtre écaillé, coulures, soubassement turquoise sale.
+    wall = Image.new("RGB", (512, 512), (214, 170, 78))
+    halftone(wall, (180, 130, 50, 70), 16, 3)
+    peel(wall, rng, 7, (236, 214, 160), (14, 34))
+    wd = ImageDraw.Draw(wall, "RGBA")
+    for _ in range(10):
+        x, y, length = rng.randrange(512), rng.randrange(260), rng.randrange(40, 120)
+        wd.line((x, y, x + rng.randrange(-3, 3), y + length), fill=(120, 90, 40, 70), width=rng.randrange(3, 7))
+    wd.rectangle((0, 300, 512, 512), fill=(78, 140, 132))
+    wd.line((0, 300, 512, 300), fill=INK, width=5)
+    for _ in range(8):
+        x = rng.randrange(512)
+        wd.rectangle((x, 304 + rng.randrange(0, 60), x + rng.randrange(12, 40), 304 + rng.randrange(70, 150)), fill=(150, 150, 120, 90))
+    wd.rectangle((0, 470, 512, 512), fill=(48, 72, 72))
+    wd.line((0, 470, 512, 470), fill=INK, width=4)
+    speckle(wall, rng, 420, [(0, 0, 0, 34), (255, 255, 255, 30), (90, 70, 30, 40)], (1, 3))
+    save_all(wall, "textures", "mur_salle_crade.png", hd_width=512)
+
+    # Nappe crade : formica rose passé, sans damier, rayures et ronds de verre.
+    cell = 128
+    table = Image.new("RGB", (10 * cell, 3 * cell), (226, 160, 160))
+    bd = ImageDraw.Draw(table, "RGBA")
+    for _ in range(60):
+        x, y = rng.randrange(10 * cell), rng.randrange(3 * cell)
+        bd.line((x, y, x + rng.randrange(-60, 60), y + rng.randrange(-12, 12)), fill=(255, 235, 235, 90), width=1)
+    for _ in range(14):
+        x, y, r = rng.randrange(10 * cell), rng.randrange(3 * cell), rng.randrange(14, 26)
+        bd.ellipse((x - r, y - r, x + r, y + r), outline=(150, 90, 70, 80), width=3)
+    bd.rectangle((0, 0, 10 * cell - 1, 3 * cell - 1), outline=INK, width=9)
+    bd.rectangle((11, 11, 10 * cell - 12, 3 * cell - 12), outline=(240, 200, 200), width=4)
+    speckle(table, rng, 340, [(140, 80, 80, 50), (255, 255, 255, 50)], (1, 2.5))
+    save_all(table, "textures", "table_crade.png", hd_width=10 * cell)
+
+    # Cuisine pop 80 : damier rose et turquoise, quelques taches de sauce.
+    kitchen = checker(8, 128, (64, 178, 168), (240, 150, 178), (40, 70, 80), rng,
+                      stains=[((200, 90, 50, 70), 6), ((240, 230, 200, 70), 5), ((110, 150, 60, 60), 4)])
+    save_all(kitchen, "textures", "sol_cuisine_pop80.png", hd_width=1024)
+
+    # Mur de la cuisine pop 80 : faïence jaune, zigzags et confettis Memphis, plinthe turquoise.
+    tiles = Image.new("RGB", (512, 512), (246, 222, 120))
+    td = ImageDraw.Draw(tiles, "RGBA")
+    for k in range(0, 513, 64):
+        td.line((k, 0, k, 512), fill=(196, 170, 80), width=3)
+        td.line((0, k, 512, k), fill=(196, 170, 80), width=3)
+    zigzag(td, 40, 512, (230, 70, 140), 10, 16, 6)
+    zigzag(td, 40, 512, INK, 10, 16, 2)
+    for _ in range(26):
+        x, y = rng.randrange(512), rng.randrange(80, 280)
+        col = rng.choice([(230, 70, 140), (40, 180, 200), (110, 70, 190), (250, 140, 40)])
+        if rng.random() < 0.5:
+            td.rectangle((x, y, x + 10, y + 4), fill=col)
+        else:
+            td.polygon([(x, y), (x + 10, y + 3), (x + 2, y + 10)], fill=col)
+    td.rectangle((0, 300, 512, 470), fill=(64, 178, 168, 255))
+    td.line((0, 300, 512, 300), fill=INK, width=5)
+    for k in range(0, 513, 64):
+        td.line((k, 300, k, 470), fill=(40, 120, 120), width=3)
+    td.rectangle((0, 470, 512, 512), fill=(150, 60, 120))
+    td.line((0, 470, 512, 470), fill=INK, width=4)
+    speckle(tiles, rng, 200, [(0, 0, 0, 22), (255, 255, 255, 40)], (1, 2.5))
+    save_all(tiles, "textures", "mur_cuisine_pop80.png", hd_width=512)
 
 
 # --- Décor mural -----------------------------------------------------------------

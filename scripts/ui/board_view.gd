@@ -158,17 +158,53 @@ func _build_floor() -> void:
 	var plane := PlaneMesh.new()
 	plane.size = Vector2.ONE
 	# La texture couvre 8 × 8 cases ; le décalage aligne les joints sur les bords des cases.
-	plane.material = _tiled("sol_salle.png", Vector3(0.125, 0.125, 0.125), Vector3(0.0625, 0, 0.0625))
+	plane.material = _tiled(level.decor("sol_salle", "sol_salle.png"), Vector3(0.125, 0.125, 0.125), Vector3(0.0625, 0, 0.0625))
 	_multimesh(plane, room, false)
 	var plane_k := PlaneMesh.new()
 	plane_k.size = Vector2.ONE
-	plane_k.material = _tiled("sol_cuisine.png", Vector3(0.125, 0.125, 0.125), Vector3(0.0625, 0, 0.0625))
+	plane_k.material = _tiled(level.decor("sol_cuisine", "sol_cuisine.png"), Vector3(0.125, 0.125, 0.125), Vector3(0.0625, 0, 0.0625))
 	_multimesh(plane_k, kitchen, false)
+	_build_puddles()
 	# Socle sombre sous le plateau, comme l'épaisseur d'un plateau de jeu.
 	var slab := MeshInstance3D.new()
 	slab.mesh = _box(Vector3(board.width + 0.6, 0.5, board.height + 0.6), _flat(Color("2a2136")))
 	slab.position = Vector3((board.width - 1) / 2.0, -0.26, (board.height - 1) / 2.0)
 	add_child(slab)
+
+
+## Flaques (niveau 3) : nappe d'eau bleutée case par case, pour qu'on voie d'un coup d'œil quelles
+## cases coûtent plus cher ; un trait d'encre borde la flaque là où elle touche le sol sec, et
+## quelques reflets la font briller.
+func _build_puddles() -> void:
+	var cells := board.cells_of(Board.Terrain.PUDDLE)
+	if cells.is_empty():
+		return
+	var water := _flat(Color(0.5, 0.76, 0.92, 0.62), true)
+	water.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	water.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	var plane := PlaneMesh.new()
+	plane.size = Vector2.ONE
+	plane.material = water
+	var tiles := []
+	var edges := []
+	var glints := []
+	for c in cells:
+		tiles.append(Transform3D(Basis(), cell_to_world(c, 0.016)))
+		for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			if board.is_puddle(c + d):
+				continue
+			var mid := cell_to_world(c, 0.02) + Vector3(d.x, 0, d.y) * 0.48
+			var basis := Basis() if d.y != 0 else Basis(Vector3.UP, PI / 2.0)
+			edges.append(Transform3D(basis, mid))
+		if _rng.randf() < 0.45:
+			var g := Basis(Vector3.UP, _rng.randf_range(-0.4, 0.4)).scaled(Vector3(_rng.randf_range(0.25, 0.4), 1, 0.07))
+			glints.append(Transform3D(g, cell_to_world(c, 0.022) + Vector3(_rng.randf_range(-0.2, 0.2), 0, _rng.randf_range(-0.25, 0.25))))
+	_multimesh(plane, tiles, false)
+	_multimesh(_box(Vector3(1.0, 0.01, 0.06), _flat(Color(0.16, 0.3, 0.42), true)), edges, false)
+	var glint := PlaneMesh.new()
+	glint.size = Vector2.ONE
+	glint.material = _flat(Color(0.95, 0.99, 1.0), true)
+	_multimesh(glint, glints, false)
 
 
 func _near_kitchen(c: Vector2i) -> bool:
@@ -180,7 +216,7 @@ func _near_kitchen(c: Vector2i) -> bool:
 
 func _near_room(c: Vector2i) -> bool:
 	for n in Board.neighbors8(c):
-		if board.terrain(n) == Board.Terrain.FLOOR:
+		if board.terrain(n) == Board.Terrain.FLOOR or board.is_puddle(n):
 			return true
 	return false
 
@@ -210,7 +246,7 @@ func _build_walls() -> void:
 	# La texture de mur fait 2 m de large et toute la hauteur du mur : un mur abaissé n'en montre
 	# que le bas (la plinthe et le soubassement turquoise).
 	var scale := Vector3(0.5, 1.0 / WALL_HEIGHT, 0.5)
-	var mats := {false: _tiled("mur_salle.png", scale), true: _tiled("mur_cuisine.png", scale)}
+	var mats := {false: _tiled(level.decor("mur_salle", "mur_salle.png"), scale), true: _tiled(level.decor("mur_cuisine", "mur_cuisine.png"), scale)}
 	var ink := _flat(BD.INK, true)
 	var top := _flat(Color("8a6a2c"), true)
 	var lists := {}
@@ -495,7 +531,7 @@ func _build_wall_decor() -> void:
 func _build_tables() -> void:
 	var legs := []
 	var top_mat := StandardMaterial3D.new()
-	top_mat.albedo_texture = GameAssets.texture("textures", "table.png")
+	top_mat.albedo_texture = GameAssets.texture("textures", level.decor("table", "table.png"))
 	top_mat.roughness = 1.0
 	top_mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	top_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC if GameAssets.is_hd() else BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS

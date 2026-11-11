@@ -27,6 +27,7 @@ var dex_d6 := 0
 var dex_bonus := 0
 
 var ap := 0
+var ap_bonus := 0           ## PA gagnés en campagne (année scolaire)
 var has_shot := false        ## a déjà tiré (ou ne peut plus tirer) ce tour
 var on_table := false
 var turns_on_table := 0

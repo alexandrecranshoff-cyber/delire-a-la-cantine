@@ -36,6 +36,7 @@ Le concept de Zieuglôque (`3f48139f`) précède le strabisme : la fiche fait fo
 | `cantine_3_pop80.png` | Salle pop années 80, niveau ultérieur | f078d4ec |
 | `cuisine_1_grasse.png` | Cuisine propre et grasse, **niveau 1** | 199f4c5b |
 | `cuisine_2_chaotique.png` | Cuisine chaotique, niveau ultérieur | 1d29b4aa |
+| `cuisine_3_pop80.png` | Cuisine pop années 80 (11/11/2026), **niveau 2** | 65c0fec1 |
 | `planche_manteaux.png` | Dix manteaux et sacs accrochés, découpés pour les portemanteaux | voir métadonnées |
 | `planche_mural.png` | Décor mural : fenêtre, horloge, liège, affiches, menu, photo de classe, radiateur, extincteur | voir métadonnées |
 
@@ -45,6 +46,7 @@ Le concept de Zieuglôque (`3f48139f`) précède le strabisme : la fiche fait fo
 |---|---|---|
 | `accessoires.png` | Tables, bancs, bacs, chariots, robinet, portes, plateaux | 30ad5fad |
 | `projectiles.png` | Les 12 projectiles du livret | c94cd2c0 |
+| `projectiles_menus.png` | Plats des menus du jour (poisson pané, épinards, semoule, brandade, dinde, bûche ; doublons non utilisés) | ce548224 |
 | `effets_bd.png` | Onomatopées, taches au sol, bulles | eae5daba |
 
 ## interface/

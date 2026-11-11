@@ -1,0 +1,41 @@
+{
+  "_note": "Année scolaire (campagne solo). services : un niveau par mois, dans l'ordre ; « niveau » vide = service pas encore construit. pression : durcissement propre au service, ajouté à la difficulté choisie (moral_ia_pct : moral des adversaires en plus, en % de la fiche ; prof_periode_moins : les profs entrent plus souvent ; tours_munitions_tables : tours où les tables sont garnies). experience : points gagnés par élève à la fin d'un service. ameliorations : dépenses possibles entre deux services (cout en points, max = nombre d'achats). adresse : 1er achat +1 au jet, 2e achat un dé de plus. colle : un élève emmené par un prof ou plongé dans un bac commence le service suivant avec ce pourcentage de son moral.",
+  "nom": "Année scolaire 1984-1985",
+  "services": [
+    {
+      "id": "septembre",
+      "mois": "Septembre",
+      "titre": "La rentrée",
+      "niveau": "niveau_1",
+      "resume": "Premier service de l'année dans la cantine du collège. Les tables sont garnies, les profs encore un peu endormis.",
+      "pression": {}
+    },
+    {
+      "id": "novembre",
+      "mois": "Novembre",
+      "titre": "Jour du poisson",
+      "niveau": "niveau_2",
+      "resume": "Tables remises en long, cuisine refaite à la Toussaint et menu du vendredi : poisson pané, épinards, brandade. Un chariot de poisson est resté dans la salle.",
+      "pression": {"moral_ia_pct": 10}
+    },
+    {
+      "id": "decembre",
+      "mois": "Décembre",
+      "titre": "Repas de Noël",
+      "niveau": "niveau_3",
+      "resume": "La vieille salle du fond, le toit fuit : les flaques ralentissent (2 PA la case). Au menu, dinde aux marrons et bûche. Les profs sont nerveux avant les vacances.",
+      "pression": {"moral_ia_pct": 20, "prof_periode_moins": 1, "tours_munitions_tables": 3}
+    },
+    {"id": "fevrier", "mois": "Février", "titre": "Mardi gras", "niveau": "", "resume": "Bientôt : le cuisinier sort de sa cuisine et les chariots roulent tout seuls.", "pression": {}},
+    {"id": "avril", "mois": "Avril", "titre": "L'inspection", "niveau": "", "resume": "Bientôt : un inspecteur traverse la cantine. Gare à celui qui le touche.", "pression": {}},
+    {"id": "juin", "mois": "Juin", "titre": "Dernier jour", "niveau": "", "resume": "Bientôt : la grande bataille de fin d'année, contre trois bandes.", "pression": {}}
+  ],
+  "bulletin_apres": "decembre",
+  "experience": {"touche": 1, "sature": 3, "reste_a_table": 2, "victoire": 2},
+  "ameliorations": {
+    "moral": {"nom": "Moral +10", "cout": 4, "gain": 10, "max": 3},
+    "adresse": {"nom": "Adresse", "cout": 6, "max": 2},
+    "pa": {"nom": "+1 PA", "cout": 8, "gain": 1, "max": 2}
+  },
+  "colle": {"moral_pct": 70}
+}

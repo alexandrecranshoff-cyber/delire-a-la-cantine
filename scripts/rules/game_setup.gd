@@ -1,6 +1,7 @@
 class_name GameSetup
 extends RefCounted
-## Prépare une partie : niveau, nombre de bandes, bandes jouées par l'ordinateur, difficulté.
+## Prépare une partie : niveau (plan, menu du jour, réglages), nombre de bandes, bandes jouées par
+## l'ordinateur, difficulté.
 
 const DIFFICULTY_PATH := "res://data/difficulte.json"
 
@@ -11,7 +12,10 @@ static func difficulties() -> Dictionary:
 
 ## `ai_teams` : numéros des bandes de l'ordinateur. `difficulty` : clé de difficulte.json ("" = règles du livret).
 static func new_game(level: Level, data: GameData, seed_value: int, players: int, ai_teams: Array = [], difficulty: String = "") -> GameState:
+	data.apply_menu(level.menu())
 	var state := level.build_state(data, DiceRoller.new(seed_value), players)
+	for k in level.options().keys():
+		state.options[k] = int(level.options()[k])
 	for t in ai_teams:
 		state.ai_teams.append(int(t))
 	if difficulty != "":

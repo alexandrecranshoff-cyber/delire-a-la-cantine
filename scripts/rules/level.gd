@@ -15,6 +15,25 @@ static func load_file(path: String) -> Level:
 	return lv
 
 
+## Plats du menu du jour (remplacent des lignes de la table des projectiles), vide si menu du livret.
+func menu() -> Dictionary:
+	return raw.get("menu", {}).get("plats", {})
+
+
+func menu_name() -> String:
+	return str(raw.get("menu", {}).get("nom", ""))
+
+
+## Habillage du niveau : nom d'image pour un élément du décor (sol, murs, nappe), ou `fallback`.
+func decor(part: String, fallback: String) -> String:
+	return str(raw.get("decor", {}).get(part, fallback))
+
+
+## Réglages propres au niveau qui remplacent ceux de regles_video.json (voir GameState.options).
+func options() -> Dictionary:
+	return raw.get("options", {})
+
+
 func board() -> Board:
 	return Board.from_ascii(raw["plan"])
 

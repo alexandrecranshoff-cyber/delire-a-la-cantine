@@ -12,6 +12,10 @@ func _ready() -> void:
 		# Capture d'écran automatique (contrôle visuel) : capture=fichier.png attente=secondes
 		if a.begins_with("capture="):
 			_capture_later(a.split("=")[1], args)
+	if args.has("annee_ecran"):
+		GameConfig.show_bulletin = args.has("bulletin")
+		_show_campaign()  # contrôle visuel de l'écran de l'année
+		return
 	if args.has("partie"):
 		for a in args:
 			if GameSetup.difficulties().has(a):
@@ -20,6 +24,10 @@ func _ready() -> void:
 				GameConfig.seed_value = int(a.split("=")[1])
 			if a == "duo":
 				GameConfig.solo = false
+			if a == "annee":
+				GameConfig.campaign = true  # essais : service en cours de l'année scolaire
+			if a.begins_with("niveau="):
+				GameConfig.level_path = "res://data/niveaux/niveau_%s.json" % a.split("=")[1]
 			if a == "reprendre":
 				GameConfig.pending_load = SaveSlots.all().get("auto", {})  # essais : reprise automatique
 		_show_game()
@@ -39,6 +47,7 @@ func _show_menu() -> void:
 	var menu := Menu.new()
 	layer.add_child(menu)
 	menu.start_game.connect(_show_game)
+	menu.open_campaign.connect(_show_campaign)
 	_swap(layer)
 	if OS.get_cmdline_user_args().has("sauvegardes"):
 		menu.add_child(SavePanel.new(false))  # contrôle visuel de la fenêtre des sauvegardes
@@ -48,7 +57,27 @@ func _show_game() -> void:
 	var game := GameView.new()
 	game.back_to_menu.connect(_show_menu)
 	game.replay.connect(_show_game)
+	game.campaign_next.connect(_show_campaign)
 	_swap(game)
+
+
+## Écran de l'année scolaire (campagne solo).
+func _show_campaign() -> void:
+	var year := CampaignStore.load_year()
+	if year == null:
+		year = Campaign.new_year(GameConfig.difficulty, GameData.load_default().student_names())
+		CampaignStore.save_year(year)
+	var layer := CanvasLayer.new()
+	var screen := CampaignScreen.new(year)
+	layer.add_child(screen)
+	screen.play_service.connect(func():
+		GameConfig.campaign = true
+		GameConfig.last_gains = {}
+		_show_game())
+	screen.back_to_menu.connect(func():
+		GameConfig.last_gains = {}
+		_show_menu())
+	_swap(layer)
 
 
 func _capture_later(file: String, args: Array) -> void:

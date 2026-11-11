@@ -2,7 +2,7 @@ class_name Effects
 extends Node3D
 ## Effets de BD : projectiles qui volent, onomatopées, taches au sol, bulles, chiffres de dégâts.
 
-## Projectile du livret -> onomatopée, tache au sol, couleur de la tache.
+## Projectile du livret (ou plat d'un menu du jour) -> onomatopée, tache au sol, couleur de la tache.
 const IMPACTS := {
 	"2": ["bloup", "tache_creme", Color(0.6, 0.85, 1.0, 0.8)],
 	"3": ["floc", "tache_marron", Color(0.75, 0.8, 0.85)],
@@ -16,6 +16,13 @@ const IMPACTS := {
 	"11": ["paf", "tache_creme", Color(1.0, 0.8, 0.9)],
 	"12": ["schlurp", "tache_verte", Color.WHITE],
 	"robinet": ["bloup", "tache_creme", Color(0.6, 0.85, 1.0, 0.7)],
+	# Menus du jour (data/niveaux/*.json, « image » des plats).
+	"poisson": ["paf", "tache_creme", Color(1.0, 0.85, 0.5)],
+	"epinards": ["splatch", "tache_verte", Color(0.6, 0.8, 0.5)],
+	"semoule": ["floc", "tache_creme", Color(1.0, 0.95, 0.6)],
+	"brandade": ["schlurp", "tache_creme", Color.WHITE],
+	"dinde": ["paf", "tache_marron", Color(1.0, 0.85, 0.7)],
+	"buche": ["splatch", "tache_marron", Color(0.7, 0.5, 0.4)],
 }
 const MAX_FLOOR_STAINS := 70
 
