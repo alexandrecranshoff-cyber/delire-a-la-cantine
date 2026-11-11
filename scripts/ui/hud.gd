@@ -318,7 +318,7 @@ func _build_help() -> void:
 	BD.content(sheet).add_child(col)
 	col.add_child(BD.label("COMMENT JOUER", 54, BD.RED, true))
 	var lines := [
-		"But : être la dernière bande dans la cantine. À la sonnerie (tour 12), la bande qui garde le plus de moral gagne.",
+		"But : être la dernière bande dans la cantine. À la sonnerie (tour 12), la bande qui a le plus chahuté les autres (moral qu'elle leur a fait perdre) gagne.",
 		"Clic sur un de tes élèves pour le choisir (ou Tab), clic sur une case verte pour y aller : 1 PA par case, 12 PA par tour. Cases rouges : à portée d'un prof ou du cuisinier.",
 		"Clic sur un adversaire pour lui lancer ce qui te tombe sous la main : 4 PA, une fois par tour. Deux dés désignent le projectile.",
 		"Pour toucher, les dés de dextérité doivent atteindre la distance + la difficulté (CX) du projectile. Plus tu es près, mieux c'est.",
@@ -361,7 +361,7 @@ func set_status(state: GameState, human_turn: bool) -> void:
 		_ammo_label.add_theme_color_override("font_color", BD.RED)
 	var parts := []
 	for t in state.team_count:
-		parts.append("%s : %d élève%s, moral %d" % [BD.TEAM_NAMES[t].capitalize(), state.students_left(t).size(), "s" if state.students_left(t).size() > 1 else "", state.team_moral(t)])
+		parts.append("%s : %d élève%s, moral %d, chahut %d" % [BD.TEAM_NAMES[t].capitalize(), state.students_left(t).size(), "s" if state.students_left(t).size() > 1 else "", state.team_moral(t), int(state.chahut.get(t, 0))])
 	_score_label.text = "   •   ".join(parts)
 	_end_button.disabled = not human_turn
 

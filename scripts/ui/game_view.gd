@@ -711,6 +711,8 @@ func _advance() -> void:
 				return
 			continue
 		break
+	# Le tour des autres est fini : on rend la main à vitesse normale, sinon les clics restent avalés.
+	_end_skip()
 	if human_teams.size() > 1:
 		await hud.show_pass_screen(state.current_team)
 	viewer_team = state.current_team if human_teams.has(state.current_team) else viewer_team
@@ -768,19 +770,20 @@ func _show_game_over(o: Dictionary) -> void:
 	var intro := ""
 	match o["reason"]:
 		"dernier": intro = "La %s est la dernière dans la cantine." % BD.team_name(winner).to_lower()
-		"sonnerie": intro = "La sonnerie a retenti. La bande qui garde le plus de moral l'emporte." if winner >= 0 else "La sonnerie a retenti sur une égalité parfaite."
+		"sonnerie": intro = "La sonnerie a retenti. La bande qui a le plus chahuté les autres l'emporte." if winner >= 0 else "La sonnerie a retenti sur une égalité parfaite."
 		"personne": intro = "Plus un seul élève dans la cantine : les profs ont gagné."
 	var teams := []
-	var rows := [["Élèves encore à table"], ["Moral restant"], ["Tirs réussis"], ["Adversaires saturés"], ["Emmenés par un prof"], ["Plongés dans le plat du jour"]]
+	var rows := [["Chahut (moral fait perdre)"], ["Élèves encore à table"], ["Moral restant"], ["Tirs réussis"], ["Adversaires saturés"], ["Emmenés par un prof"], ["Plongés dans le plat du jour"]]
 	for t in state.team_count:
 		var st: Dictionary = _stats[t]
 		teams.append(t)
-		rows[0].append(str(state.students_left(t).size()))
-		rows[1].append(str(state.team_moral(t)))
-		rows[2].append("%d sur %d" % [st["touches"], st["tirs"]])
-		rows[3].append(str(st["satures"]))
-		rows[4].append(str(st["emmenes"]))
-		rows[5].append(str(st["plonges"]))
+		rows[0].append(str(int(state.chahut.get(t, 0))))
+		rows[1].append(str(state.students_left(t).size()))
+		rows[2].append(str(state.team_moral(t)))
+		rows[3].append("%d sur %d" % [st["touches"], st["tirs"]])
+		rows[4].append(str(st["satures"]))
+		rows[5].append(str(st["emmenes"]))
+		rows[6].append(str(st["plonges"]))
 	var comment := ""
 	if GameConfig.solo:
 		comment = "Difficulté « %s ». Appréciation : %s" % [GameSetup.difficulties()[GameConfig.difficulty]["nom"], _appreciation(won)]
