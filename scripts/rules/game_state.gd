@@ -33,6 +33,14 @@ func _init(p_board: Board, p_data: GameData, p_dice: DiceRoller) -> void:
 	dice = p_dice
 
 
+func next_unit_id() -> int:
+	return _next_id
+
+
+func set_next_unit_id(value: int) -> void:
+	_next_id = value
+
+
 func add_unit(kind: Unit.Kind, char_key: String, pos: Vector2i, team: int = Unit.NO_TEAM, display_name: String = "") -> Unit:
 	var u := Unit.new()
 	u.id = _next_id

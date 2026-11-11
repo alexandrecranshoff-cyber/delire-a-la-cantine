@@ -76,6 +76,17 @@ func _ready() -> void:
 	play.custom_minimum_size = Vector2(0, 96)
 	play.pressed.connect(func(): start_game.emit())
 	col.add_child(play)
+	# Reprendre une partie sauvegardée (reprise automatique ou emplacement choisi).
+	if SaveSlots.has_any():
+		var resume := BD.sticker("REPRENDRE UNE PARTIE", Color("2f7fe6"), 28)
+		resume.pressed.connect(func():
+			var panel := SavePanel.new(false)
+			panel.chosen.connect(func(key: String):
+				GameConfig.pending_load = SaveSlots.all().get(key, {})
+				panel.queue_free()
+				start_game.emit())
+			add_child(panel))
+		col.add_child(resume)
 
 	var opts := HBoxContainer.new()
 	opts.add_theme_constant_override("separation", 10)

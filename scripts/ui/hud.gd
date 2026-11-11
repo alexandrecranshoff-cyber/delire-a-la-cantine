@@ -11,6 +11,7 @@ signal unit_picked(id: int)
 signal menu_pressed
 signal replay_pressed
 signal speed_toggled(fast: bool)
+signal save_pressed
 
 var dice: DiceTray
 
@@ -125,6 +126,10 @@ func _build_top() -> void:
 		Sound.refresh_settings())
 	row.add_child(_music_button)
 	set_music(GameConfig.music_on)
+	var save_btn := BD.sticker("SAUVER", Color("2f7fe6"), 20)
+	save_btn.tooltip_text = "Sauvegarder la partie (F5)"
+	save_btn.pressed.connect(func(): save_pressed.emit())
+	row.add_child(save_btn)
 	var help_btn := BD.sticker("?", Color("2f9e8f"), 22)
 	help_btn.tooltip_text = "Comment jouer (F1)"
 	help_btn.pressed.connect(toggle_help)
@@ -328,10 +333,12 @@ func _build_help() -> void:
 	col.add_theme_constant_override("separation", 6)
 	BD.content(sheet).add_child(col)
 	col.add_child(BD.label("COMMENT JOUER", 54, BD.RED, true))
+	var rules := GameData.load_default().rules
+	var ap: Dictionary = rules["points_action"]
 	var lines := [
-		"But : être la dernière bande dans la cantine. À la sonnerie (tour 12), la bande qui a le plus chahuté les autres (moral qu'elle leur a fait perdre) gagne.",
-		"Clic sur un de tes élèves pour le choisir (ou Tab), clic sur une case verte pour y aller : 1 PA par case, 12 PA par tour. Cases rouges : à portée d'un prof ou du cuisinier.",
-		"Clic sur un adversaire pour lui lancer ce qui te tombe sous la main : 4 PA, une fois par tour. Deux dés désignent le projectile.",
+		"But : être la dernière bande dans la cantine. À la sonnerie (tour %d), la bande qui a le plus chahuté les autres (moral qu'elle leur a fait perdre) gagne." % int(rules["tours_max"]),
+		"Clic sur un de tes élèves pour le choisir (ou Tab), clic sur une case verte pour y aller : %d PA par case, %d PA par tour. Cases rouges : à portée d'un prof ou du cuisinier." % [int(ap["deplacement"]), int(ap["par_tour"])],
+		"Clic sur un adversaire pour lui lancer ce qui te tombe sous la main : %d PA, une fois par tour. Deux dés désignent le projectile." % int(ap["tir"]),
 		"Pour toucher, les dés de dextérité doivent atteindre la distance + la difficulté (CX) du projectile. Plus tu es près, mieux c'est.",
 		"Munitions : au contact d'une table (tours 1 à 4), puis seulement des bacs et des chariots de la cuisine. On garde une munition en poche.",
 		"Moral à zéro : l'élève est saturé et file vers la sortie. Un tir raté retombe sur un voisin.",
@@ -340,7 +347,7 @@ func _build_help() -> void:
 		"Neutre touché : sur 1 il te rejoint, sur 6 il devient berserk, sinon il s'enfuit.",
 		"Clic sur une table au contact pour grimper dessus (tout le tour). Clic sur un chariot au contact pour le pousser de 3 cases.",
 		"Caméra : clic droit pour tourner (glisser en haut ou en bas pour l'incliner, ou Page préc. et Page suiv.), Q et E par crans, molette pour zoomer, flèches ou clic molette pour se déplacer.",
-		"Entrée : fin du tour.  R : arroser au robinet.  P : projeter.  V : vitesse.  M : musique.  Espace : accélérer le tour des autres.  Échap : désélectionner.",
+		"Entrée : fin du tour.  R : arroser au robinet.  P : projeter.  V : vitesse.  M : musique.  F5 : sauvegarder.  Espace : accélérer le tour des autres.  Échap : désélectionner.",
 	]
 	for line in lines:
 		var l := BD.label("•  " + line, 25)
@@ -372,7 +379,7 @@ func set_status(state: GameState, human_turn: bool) -> void:
 		_ammo_label.add_theme_color_override("font_color", BD.RED)
 	var parts := []
 	for t in state.team_count:
-		parts.append("%s : %d élève%s, moral %d, chahut %d" % [BD.TEAM_NAMES[t].capitalize(), state.students_left(t).size(), "s" if state.students_left(t).size() > 1 else "", state.team_moral(t), int(state.chahut.get(t, 0))])
+		parts.append("%s : %d él., moral %d, chahut %d" % [BD.TEAM_NAMES[t].capitalize(), state.students_left(t).size(), state.team_moral(t), int(state.chahut.get(t, 0))])
 	_score_label.text = "   •   ".join(parts)
 	_end_button.disabled = not human_turn
 
