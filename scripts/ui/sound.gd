@@ -40,8 +40,18 @@ static func ambience(on: bool) -> void:
 
 static func refresh_settings() -> void:
 	if instance != null:
-		instance._music.stream_paused = not GameConfig.music_on
+		instance._apply_music_setting()
 		instance._ambience.stream_paused = not GameConfig.sound_on
+
+
+## Musique coupée : on l'arrête pour de bon (une pause posée juste après play() ne tient pas
+## toujours, en particulier dans le navigateur) ; rallumée : on la reprend.
+func _apply_music_setting() -> void:
+	if not GameConfig.music_on:
+		_music.stop()
+	elif _music.stream != null and not _music.playing:
+		_music.stream_paused = false
+		_music.play()
 
 
 func _play(name: String, volume_db: float, pitch: float) -> void:
@@ -66,9 +76,8 @@ func _set_music(name: String) -> void:
 	var stream := GameAssets.music(name) if name != "" else null
 	_music.stop()
 	_music.stream = stream
-	if stream != null:
+	if stream != null and GameConfig.music_on:
 		_music.play()
-		_music.stream_paused = not GameConfig.music_on
 
 
 func _set_ambience(on: bool) -> void:

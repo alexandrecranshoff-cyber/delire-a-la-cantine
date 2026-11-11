@@ -11,7 +11,10 @@ const STEP_TIME := 0.085
 const ROTATE_STEP := 45.0
 const ROTATE_DRAG_SPEED := 0.4  # degrés par pixel
 ## Hauteur de la caméra pour 1 m de recul : 0.85 donne une vue plongeante d'environ 40°, qui laisse voir les personnages de trois quarts.
-const CAM_HEIGHT := 0.85
+const CAM_HEIGHT := 0.85          # inclinaison de départ (hauteur relative de la caméra)
+const CAM_TILT_MIN := 0.45        # vue rasante
+const CAM_TILT_MAX := 2.6         # presque à la verticale
+const TILT_DRAG_SPEED := 0.006    # par pixel de glissé vertical au clic droit
 
 var state: GameState
 var level: Level
@@ -35,6 +38,7 @@ var _overlay_mesh := MultiMesh.new()
 var _cam_target := Vector3.ZERO
 var _cam_angle := 45.0
 var _cam_fixed := false           # contrôle visuel : la caméra reste sur la cible demandée
+var _cam_tilt := CAM_HEIGHT
 var _cam_zoom := 17.0   # assez près pour reconnaître les personnages ; molette jusqu'à 46
 var _panning := false
 var _rotating := false
@@ -208,12 +212,14 @@ func _setup_environment() -> void:
 	camera.far = 200.0
 	add_child(camera)
 	_cam_target = Vector3(state.board.width / 2.0 + 1.5, 0, state.board.height / 2.0 + 1.5)
-	# Réglages de contrôle visuel : zoom=12 angle=90 cible=10,8
+	# Réglages de contrôle visuel : zoom=12 angle=90 inclinaison=1.5 cible=10,8
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("zoom="):
 			_cam_zoom = float(a.split("=")[1])
 		elif a.begins_with("angle="):
 			_cam_angle = float(a.split("=")[1])
+		elif a.begins_with("inclinaison="):
+			_cam_tilt = clampf(float(a.split("=")[1]), CAM_TILT_MIN, CAM_TILT_MAX)
 		elif a.begins_with("cible="):
 			var xy := a.split("=")[1].split(",")
 			_cam_target = Vector3(float(xy[0]), 0, float(xy[1]))
@@ -222,7 +228,7 @@ func _setup_environment() -> void:
 
 func _update_camera() -> void:
 	camera.size = _cam_zoom
-	var dir := Vector3(sin(deg_to_rad(_cam_angle)), CAM_HEIGHT, cos(deg_to_rad(_cam_angle))).normalized()
+	var dir := Vector3(sin(deg_to_rad(_cam_angle)), _cam_tilt, cos(deg_to_rad(_cam_angle))).normalized()
 	var shake := Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * _shake
 	camera.position = _cam_target + dir * 60.0 + shake
 	camera.look_at(_cam_target + shake, Vector3.UP)
@@ -332,6 +338,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		var mm := event as InputEventMouseMotion
 		if _rotating:
 			_set_cam_angle(_cam_angle - mm.relative.x * ROTATE_DRAG_SPEED)
+			# Glissé vertical : on incline la caméra, de la vue rasante à la vue de dessus.
+			_set_cam_tilt(_cam_tilt + mm.relative.y * TILT_DRAG_SPEED)
 		elif _panning:
 			var right := camera.global_transform.basis.x
 			var fwd := Vector3(right.z, 0, -right.x)
@@ -347,6 +355,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_ENTER, KEY_KP_ENTER: _end_turn()
 			KEY_Q, KEY_A: rotate_camera(-ROTATE_STEP)
 			KEY_E: rotate_camera(ROTATE_STEP)
+			KEY_PAGEUP: _set_cam_tilt(_cam_tilt + 0.25)
+			KEY_PAGEDOWN: _set_cam_tilt(_cam_tilt - 0.25)
+			KEY_M:
+				GameConfig.music_on = not GameConfig.music_on
+				Sound.refresh_settings()
+				hud.set_music(GameConfig.music_on)
 			KEY_R:
 				if _can_act():
 					watering = not watering
@@ -378,6 +392,11 @@ func rotate_camera(deg: float) -> void:
 	_cam_goal = goal
 	_rotate_tween = create_tween()
 	_rotate_tween.tween_method(_set_cam_angle, _cam_angle, goal, 0.25).set_trans(Tween.TRANS_SINE)
+
+
+func _set_cam_tilt(t: float) -> void:
+	_cam_tilt = clampf(t, CAM_TILT_MIN, CAM_TILT_MAX)
+	_update_camera()
 
 
 func _set_cam_angle(deg: float) -> void:
