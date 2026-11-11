@@ -1,0 +1,30 @@
+# Délire à la cantine : réglages du serveur pour le site de présentation (racine), copiés par le workflow « Mise en ligne sur iomino.fr »
+
+# Page d'accueil
+DirectoryIndex index.html
+
+# Types de fichiers : le navigateur refuse le .wasm s'il n'est pas annoncé comme tel
+AddType application/wasm .wasm
+AddType application/octet-stream .pck
+AddType text/javascript .js
+AddType image/webp .webp
+AddType font/ttf .ttf
+AddType application/zip .zip
+
+# Compression à la volée : le .wasm du jeu passe d'environ 37 Mo à environ 9 Mo transférés
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/wasm application/octet-stream font/ttf
+</IfModule>
+
+<IfModule mod_headers.c>
+  # Le navigateur revérifie les fichiers à chaque visite : une mise à jour du jeu est vue tout de suite
+  Header set Cache-Control "no-cache"
+  # Site non référencé : les moteurs de recherche n'indexent ni le site ni le jeu.
+  # Supprimer la ligne suivante le jour où le jeu est ouvert à tous.
+  Header set X-Robots-Tag "noindex, nofollow"
+</IfModule>
+
+# Forcer HTTPS : retirer les # des trois lignes suivantes une fois le certificat SSL activé chez LWS
+# RewriteEngine On
+# RewriteCond %{HTTPS} off
+# RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
