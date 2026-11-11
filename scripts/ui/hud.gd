@@ -328,10 +328,12 @@ func _build_help() -> void:
 	col.add_theme_constant_override("separation", 6)
 	BD.content(sheet).add_child(col)
 	col.add_child(BD.label("COMMENT JOUER", 54, BD.RED, true))
+	var rules := GameData.load_default().rules
+	var ap: Dictionary = rules["points_action"]
 	var lines := [
-		"But : être la dernière bande dans la cantine. À la sonnerie (tour 12), la bande qui a le plus chahuté les autres (moral qu'elle leur a fait perdre) gagne.",
-		"Clic sur un de tes élèves pour le choisir (ou Tab), clic sur une case verte pour y aller : 1 PA par case, 12 PA par tour. Cases rouges : à portée d'un prof ou du cuisinier.",
-		"Clic sur un adversaire pour lui lancer ce qui te tombe sous la main : 4 PA, une fois par tour. Deux dés désignent le projectile.",
+		"But : être la dernière bande dans la cantine. À la sonnerie (tour %d), la bande qui a le plus chahuté les autres (moral qu'elle leur a fait perdre) gagne." % int(rules["tours_max"]),
+		"Clic sur un de tes élèves pour le choisir (ou Tab), clic sur une case verte pour y aller : %d PA par case, %d PA par tour. Cases rouges : à portée d'un prof ou du cuisinier." % [int(ap["deplacement"]), int(ap["par_tour"])],
+		"Clic sur un adversaire pour lui lancer ce qui te tombe sous la main : %d PA, une fois par tour. Deux dés désignent le projectile." % int(ap["tir"]),
 		"Pour toucher, les dés de dextérité doivent atteindre la distance + la difficulté (CX) du projectile. Plus tu es près, mieux c'est.",
 		"Munitions : au contact d'une table (tours 1 à 4), puis seulement des bacs et des chariots de la cuisine. On garde une munition en poche.",
 		"Moral à zéro : l'élève est saturé et file vers la sortie. Un tir raté retombe sur un voisin.",

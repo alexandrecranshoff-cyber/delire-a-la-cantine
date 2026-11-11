@@ -57,6 +57,7 @@ var _skipping := false            # tour de l'ordinateur accéléré par le joue
 var _advancing := false           # entre la fin du tour du joueur et son tour suivant
 const FAST_SPEED := 3.0
 const SKIP_SPEED := 8.0
+const OTHERS_SPEED := 1.5
 
 
 func _ready() -> void:
@@ -299,7 +300,11 @@ func _set_fast(on: bool) -> void:
 
 
 func _apply_speed() -> void:
-	Engine.time_scale = SKIP_SPEED if _skipping else (FAST_SPEED if GameConfig.fast else 1.0)
+	var base := FAST_SPEED if GameConfig.fast else 1.0
+	# Le tour des autres (ordinateur, profs, neutres) se joue un peu plus vite que le sien.
+	if _advancing:
+		base *= OTHERS_SPEED
+	Engine.time_scale = SKIP_SPEED if _skipping else base
 
 
 ## Clic ou Espace pendant le tour des autres : on joue la suite en accéléré.
@@ -725,6 +730,7 @@ func _end_turn() -> void:
 func _advance() -> void:
 	busy = true
 	_advancing = true
+	_apply_speed()
 	_end_queued = false
 	_pushed_this_turn.clear()
 	_set_hovered(null)
