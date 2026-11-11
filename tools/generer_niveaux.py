@@ -156,7 +156,9 @@ def niveau_3():
             "12": {"nom": "bûche de Noël", "degats": {"d6": 3}, "cx": 2, "image": "buche"},
         },
     }
-    level["decor"] = {"sol_salle": "sol_salle_crade.png", "mur_salle": "mur_salle_crade.png", "table": "table_crade.png"}
+    level["decor"] = {"sol_salle": "sol_salle_crade.png", "mur_salle": "mur_salle_crade.png", "table": "table_crade.png",
+                      "sol_cuisine": "sol_cuisine_chaotique.png", "mur_cuisine": "mur_cuisine_chaotique.png"}
+    level["cuisine_en_desordre"] = True  # épluchures, marmites renversées, cagettes (BoardView)
     return level
 
 

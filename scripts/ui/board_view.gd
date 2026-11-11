@@ -351,14 +351,71 @@ func _build_kitchen_clutter(lists: Dictionary) -> void:
 			var basis := Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3(s, 1, s * _rng.randf_range(0.6, 1.0)))
 			stains.append(Transform3D(basis, cell_to_world(c, 0.012) + Vector3(_rng.randf_range(-0.3, 0.3), 0, _rng.randf_range(-0.3, 0.3))))
 	_multimesh(plane, stains, false)
+	var mess := level.kitchen_mess()
+	if mess:
+		_build_kitchen_slop()
 	var pots := [Props.stockpot(Props.INOX), Props.stockpot(Color("b9482f")), Props.plates(), Props.stockpot(Props.INOX_DARK)]
+	if mess:  # cuisine chaotique : cagettes, paniers et paquets de Noël en plus
+		pots += [Props.basket(), Props.tray_stack(), _gift_box(Color("c0392b")), Props.stockpot(Color("4f8a3a")), _gift_box(Color("2f7fe6"))]
+	var every := 2 if mess else 3
 	var k := 0
 	for side in SIDES.keys():
 		for c in lists[side][true]:
 			k += 1
-			if k % 3 != 0:
+			if k % every != 0:
 				continue
-			_mesh_at(pots[(k / 3) % pots.size()], cell_to_world(c, WALL_LOW + 0.05), _rng.randf_range(0, TAU), _sides[side]["low"])
+			var mi := _mesh_at(pots[(k / every) % pots.size()], cell_to_world(c, WALL_LOW + 0.05), _rng.randf_range(0, TAU), _sides[side]["low"])
+			if mess and _rng.randf() < 0.3:  # marmite renversée sur le muret
+				mi.rotate_object_local(Vector3.RIGHT, PI / 2.0)
+				mi.position.y += 0.12
+
+
+## Cuisine chaotique : flaques de soupe verte et de sauce au sol (simple décor, sans effet de jeu).
+func _build_kitchen_slop() -> void:
+	for spec in [[Color(0.45, 0.62, 0.16, 0.55), 0.16], [Color(0.72, 0.3, 0.12, 0.5), 0.08]]:
+		var gradient := Gradient.new()
+		gradient.set_color(0, spec[0])
+		gradient.set_offset(1, 0.85)
+		gradient.set_color(1, Color(spec[0].r, spec[0].g, spec[0].b, 0.0))
+		var tex := GradientTexture2D.new()
+		tex.gradient = gradient
+		tex.fill = GradientTexture2D.FILL_RADIAL
+		tex.fill_from = Vector2(0.5, 0.5)
+		tex.fill_to = Vector2(0.5, 0.0)
+		tex.width = 64
+		tex.height = 64
+		var mat := StandardMaterial3D.new()
+		mat.albedo_texture = tex
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+		var plane := PlaneMesh.new()
+		plane.size = Vector2.ONE
+		plane.material = mat
+		var spots := []
+		for c in board.cells_of(Board.Terrain.KITCHEN):
+			if _rng.randf() < spec[1]:
+				var s := _rng.randf_range(0.6, 1.3)
+				var basis := Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3(s, 1, s * _rng.randf_range(0.5, 0.9)))
+				spots.append(Transform3D(basis, cell_to_world(c, 0.013) + Vector3(_rng.randf_range(-0.25, 0.25), 0, _rng.randf_range(-0.25, 0.25))))
+		_multimesh(plane, spots, false)
+
+
+## Paquet cadeau (carton de bûches) : cube coloré et ruban jaune.
+func _gift_box(color: Color) -> Mesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.append_from(_box(Vector3(0.34, 0.24, 0.3), _flat(color)), 0, Transform3D(Basis(), Vector3(0, 0.12, 0)))
+	st.set_material(_flat(color))
+	var mesh := st.commit()
+	var ribbon := _flat(Color("f2c230"))
+	st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.append_from(_box(Vector3(0.36, 0.25, 0.06), ribbon), 0, Transform3D(Basis(), Vector3(0, 0.12, 0)))
+	st.append_from(_box(Vector3(0.06, 0.25, 0.32), ribbon), 0, Transform3D(Basis(), Vector3(0, 0.12, 0)))
+	st.set_material(ribbon)
+	st.commit(mesh)
+	return mesh
 
 
 ## Bande d'ombre en dégradé, posée au sol le long d'un mur (le mur est du côté -Z).
