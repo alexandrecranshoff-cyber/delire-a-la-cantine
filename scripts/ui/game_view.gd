@@ -35,7 +35,7 @@ var _overlay_mesh := MultiMesh.new()
 var _cam_target := Vector3.ZERO
 var _cam_angle := 45.0
 var _cam_fixed := false           # contrôle visuel : la caméra reste sur la cible demandée
-var _cam_zoom := 24.0
+var _cam_zoom := 17.0   # assez près pour reconnaître les personnages ; molette jusqu'à 46
 var _panning := false
 var _rotating := false
 var _rotate_tween: Tween
@@ -46,6 +46,13 @@ var _stats := {}
 var hud_auto := false
 var _last_turn_shown := 0
 var _tables_stocked := true
+var _odds: Odds
+var _pushed_this_turn := {}       # id -> pourquoi cet élève ne tire plus ce tour (chariot, table)
+var _end_queued := false          # Entrée appuyée pendant une animation : fin du tour dès qu'elle s'achève
+var _skipping := false            # tour de l'ordinateur accéléré par le joueur
+var _advancing := false           # entre la fin du tour du joueur et son tour suivant
+const FAST_SPEED := 3.0
+const SKIP_SPEED := 8.0
 
 
 func _ready() -> void:
@@ -54,6 +61,7 @@ func _ready() -> void:
 	var s := GameConfig.seed_value if GameConfig.seed_value != 0 else int(Time.get_unix_time_from_system())
 	var ai: Array = [1] if GameConfig.solo else []
 	state = GameSetup.new_game(level, data, s, GameConfig.players, ai, GameConfig.difficulty if GameConfig.solo else "")
+	_odds = Odds.new(data)
 	if not GameConfig.solo:
 		state.options["prof_periode"] = int(GameSetup.difficulties()["normal"]["prof_periode"])
 	for a in OS.get_cmdline_user_args():
@@ -107,6 +115,7 @@ func _exit_tree() -> void:
 func _intro() -> void:
 	_last_turn_shown = 1
 	await hud.show_banner("À TABLE !", BD.YELLOW, "Tour 1 : %s" % BD.team_name(state.current_team).to_lower(), 1.0)
+	_end_skip()
 	if human_teams.size() > 1:
 		await hud.show_pass_screen(state.current_team)
 	busy = false
@@ -164,6 +173,7 @@ func _add_pawn(u: Unit) -> PawnView:
 		look = Vector2(state.board.width / 2.0 - u.pos.x, state.board.height / 2.0 - u.pos.y)
 	p.set_facing(look, true)
 	p.face_camera(_cam_angle)
+	p.set_zoom(_cam_zoom)
 	pawns[u.id] = p
 	return p
 
@@ -184,8 +194,8 @@ func _setup_environment() -> void:
 	sun.light_energy = 0.46
 	sun.light_color = Color(1.0, 0.97, 0.9)
 	# Pas d'ombres calculées : celles des pions, des tables et des murs sont dessinées, comme
-	# en BD, et le rendu reste identique sur le web et sur PC. La version PC ajoute l'anticrénelage.
-	get_viewport().msaa_3d = Viewport.MSAA_4X if hd else Viewport.MSAA_DISABLED
+	# en BD, et le rendu reste identique sur le web et sur PC. Anticrénelage 2x sur le web, 4x sur PC.
+	get_viewport().msaa_3d = Viewport.MSAA_4X if hd else Viewport.MSAA_2X
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("amb="):
 			env.environment.ambient_light_energy = float(a.split("=")[1])
@@ -218,6 +228,7 @@ func _update_camera() -> void:
 	camera.look_at(_cam_target + shake, Vector3.UP)
 	for p in pawns.values():
 		p.face_camera(_cam_angle)
+		p.set_zoom(_cam_zoom)
 	if board_view != null:
 		board_view.face_camera(_cam_angle)
 	if fx != null:
@@ -278,12 +289,29 @@ func _wait(seconds: float) -> void:
 
 func _set_fast(on: bool) -> void:
 	GameConfig.fast = on
-	Engine.time_scale = 2.2 if on else 1.0
+	_apply_speed()
+
+
+func _apply_speed() -> void:
+	Engine.time_scale = SKIP_SPEED if _skipping else (FAST_SPEED if GameConfig.fast else 1.0)
+
+
+## Clic ou Espace pendant le tour des autres : on joue la suite en accéléré.
+func _skip_others() -> void:
+	if _skipping or not _advancing or over:
+		return
+	_skipping = true
+	_apply_speed()
+	hud.set_hint("Accéléré jusqu'à ton tour…")
 
 
 # --- Entrées -----------------------------------------------------------------
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _advancing and ((event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT) \
+			or (event is InputEventKey and event.pressed and event.keycode == KEY_SPACE)):
+		_skip_others()
+		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
@@ -379,6 +407,10 @@ func _process(delta: float) -> void:
 
 
 func _mouse_cell(screen: Vector2):
+	# Un personnage sous le curseur passe avant le décor : on vise son corps, pas ses pieds.
+	var pawn_cell = _pawn_under(screen)
+	if pawn_cell != null:
+		return pawn_cell
 	var origin := camera.project_ray_origin(screen)
 	var normal := camera.project_ray_normal(screen)
 	if absf(normal.y) < 0.001:
@@ -393,6 +425,26 @@ func _mouse_cell(screen: Vector2):
 		if state.board.in_bounds(c):
 			return c
 	return null
+
+
+## Case du pion dont la silhouette (des pieds à la tête, projetée à l'écran) est sous le curseur.
+## Le plus proche de la caméra gagne quand deux silhouettes se recouvrent.
+func _pawn_under(screen: Vector2):
+	var best = null
+	var best_depth := INF
+	for p: PawnView in pawns.values():
+		if not p.visible or not p.unit.is_on_board():
+			continue
+		var feet := camera.unproject_position(p.global_position)
+		var head := camera.unproject_position(p.head_position())
+		var half_w := maxf(10.0, absf(feet.y - head.y) * 0.28)
+		if screen.y < head.y - 4.0 or screen.y > feet.y + 6.0 or absf(screen.x - lerpf(feet.x, head.x, 0.5)) > half_w:
+			continue
+		var depth := camera.global_position.distance_to(p.global_position)
+		if depth < best_depth:
+			best_depth = depth
+			best = p.unit.pos
+	return best
 
 
 ## Amène la caméra sur un point s'il est hors du centre de l'écran (actions de l'ordinateur).
@@ -482,10 +534,14 @@ func _set_hovered(p: PawnView, text: String = "") -> void:
 		p.set_hover(true, text)
 
 
+func _hover_text(u: Unit) -> String:
+	return "%s  %d" % [u.name if u.kind == Unit.Kind.STUDENT else _who(u), u.moral]
+
+
 func _hover(c: Vector2i) -> void:
 	var target := _visible_unit_at(c)
 	if target != null and target.kind != Unit.Kind.CART:
-		_set_hovered(pawns[target.id], "%s  %d" % [target.name if target.kind == Unit.Kind.STUDENT else _who(target), target.moral])
+		_set_hovered(pawns[target.id], _hover_text(target))
 	else:
 		_set_hovered(null)
 	if selected == null:
@@ -510,7 +566,8 @@ func _hover(c: Vector2i) -> void:
 		var dist := Board.distance(selected.pos, target.pos)
 		if reason == "":
 			var what := "Arroser" if watering else "Lancer sur"
-			hud.set_hint("%s %s : distance %d, à battre %d + CX du projectile (%d PA)" % [what, _who(target), dist, dist, state.data.ap_cost("arrosage" if watering else "tir")])
+			var need := ("à battre %d" % (dist + Combat.min_cx(state, true))) if watering else ("à battre %d + CX du projectile" % dist)
+			hud.set_hint("%s %s : distance %d, %s (%d PA). Chances : %s" % [what, _who(target), dist, need, state.data.ap_cost("arrosage" if watering else "tir"), _chance_word(selected, dist)])
 		else:
 			hud.set_hint(_reason_text(reason))
 		return
@@ -534,7 +591,7 @@ func _hover(c: Vector2i) -> void:
 		if k != selected.pos:
 			# Vert : il restera de quoi tirer ; jaune : déplacement seul ; rouge : à portée d'un prof ou du cuisinier.
 			var keeps_shot: bool = not selected.has_shot and selected.ap - int(reach[k]) >= shot_cost
-			var color := Color(0.25, 0.95, 0.4, 0.42) if keeps_shot else Color(1.0, 0.85, 0.2, 0.36)
+			var color := Color(0.25, 0.95, 0.4, 0.46) if keeps_shot else Color(1.0, 0.85, 0.2, 0.44)
 			if threat.has(k):
 				color = Color(1.0, 0.25, 0.2, 0.5)
 			cells.append([k, color])
@@ -561,6 +618,8 @@ func _click(c: Vector2i) -> void:
 	if push_cart != null:
 		events = GameActions.push_cart(state, selected, push_cart, c)
 		push_cart = null
+		if not events.is_empty():
+			_pushed_this_turn[selected.id] = "Pas de tir après avoir poussé un chariot."
 		if events.is_empty():
 			_refresh_all()
 			return
@@ -576,8 +635,10 @@ func _click(c: Vector2i) -> void:
 		events = GameActions.shoot(state, selected, target, watering)
 	elif Movement.can_climb(state, selected, c):
 		events = GameActions.climb(state, selected, c)
+		_pushed_this_turn[selected.id] = "Monter sur une table prend tout le tour : pas de tir."
 	elif Movement.can_descend(state, selected, c):
 		events = GameActions.descend(state, selected, c)
+		_pushed_this_turn[selected.id] = "Descendre d'une table prend tout le tour : pas de tir."
 	else:
 		events = GameActions.move(state, selected, c)
 	if events.is_empty():
@@ -598,6 +659,9 @@ func _run(events: Array) -> void:
 		return
 	busy = false
 	_refresh_all()
+	if _end_queued:
+		_end_queued = false
+		_end_turn()
 
 
 ## Victimes que la bande active peut projeter dans un bac ou un chariot.
@@ -629,6 +693,9 @@ func _project() -> void:
 
 func _end_turn() -> void:
 	if not _can_act():
+		# Pendant l'animation d'une action du joueur, on garde l'appui pour la fin de l'animation.
+		if busy and not over and not _advancing and human_teams.has(state.current_team):
+			_end_queued = true
 		return
 	busy = true
 	_select(null)
@@ -638,6 +705,11 @@ func _end_turn() -> void:
 ## Termine le tour de la bande active puis enchaîne jusqu'au prochain joueur humain.
 func _advance() -> void:
 	busy = true
+	_advancing = true
+	_end_queued = false
+	_pushed_this_turn.clear()
+	_set_hovered(null)
+	hud.set_hint("Clic ou Espace : accélérer" if not opponents.is_empty() else "")
 	while true:
 		var events := TurnFlow.end_team_turn(state)
 		await _play(events)
@@ -649,6 +721,8 @@ func _advance() -> void:
 				return
 			continue
 		break
+	# Le tour des autres est fini : on rend la main à vitesse normale, sinon les clics restent avalés.
+	_end_skip()
 	if human_teams.size() > 1:
 		await hud.show_pass_screen(state.current_team)
 	viewer_team = state.current_team if human_teams.has(state.current_team) else viewer_team
@@ -656,6 +730,13 @@ func _advance() -> void:
 	_select_first()
 	if selected != null:
 		_focus(pawns[selected.id].global_position)
+
+
+func _end_skip() -> void:
+	_advancing = false
+	_skipping = false
+	_apply_speed()
+	hud.set_hint("")
 
 
 func _ai_turn(bot: Opponent) -> void:
@@ -676,6 +757,7 @@ func _check_over() -> bool:
 		return false
 	over = true
 	busy = true
+	_end_skip()
 	_select(null)
 	_show_game_over(o)
 	return true
@@ -698,19 +780,20 @@ func _show_game_over(o: Dictionary) -> void:
 	var intro := ""
 	match o["reason"]:
 		"dernier": intro = "La %s est la dernière dans la cantine." % BD.team_name(winner).to_lower()
-		"sonnerie": intro = "La sonnerie a retenti. La bande qui garde le plus de moral l'emporte." if winner >= 0 else "La sonnerie a retenti sur une égalité parfaite."
+		"sonnerie": intro = "La sonnerie a retenti. La bande qui a le plus chahuté les autres l'emporte." if winner >= 0 else "La sonnerie a retenti sur une égalité parfaite."
 		"personne": intro = "Plus un seul élève dans la cantine : les profs ont gagné."
 	var teams := []
-	var rows := [["Élèves encore à table"], ["Moral restant"], ["Tirs réussis"], ["Adversaires saturés"], ["Emmenés par un prof"], ["Plongés dans le plat du jour"]]
+	var rows := [["Chahut (moral fait perdre)"], ["Élèves encore à table"], ["Moral restant"], ["Tirs réussis"], ["Adversaires saturés"], ["Emmenés par un prof"], ["Plongés dans le plat du jour"]]
 	for t in state.team_count:
 		var st: Dictionary = _stats[t]
 		teams.append(t)
-		rows[0].append(str(state.students_left(t).size()))
-		rows[1].append(str(state.team_moral(t)))
-		rows[2].append("%d sur %d" % [st["touches"], st["tirs"]])
-		rows[3].append(str(st["satures"]))
-		rows[4].append(str(st["emmenes"]))
-		rows[5].append(str(st["plonges"]))
+		rows[0].append(str(int(state.chahut.get(t, 0))))
+		rows[1].append(str(state.students_left(t).size()))
+		rows[2].append(str(state.team_moral(t)))
+		rows[3].append("%d sur %d" % [st["touches"], st["tirs"]])
+		rows[4].append(str(st["satures"]))
+		rows[5].append(str(st["emmenes"]))
+		rows[6].append(str(st["plonges"]))
 	var comment := ""
 	if GameConfig.solo:
 		comment = "Difficulté « %s ». Appréciation : %s" % [GameSetup.difficulties()[GameConfig.difficulty]["nom"], _appreciation(won)]
@@ -933,15 +1016,17 @@ func _play_shot(e: Dictionary) -> void:
 		dest = pawns[victim.id].body_position()
 	elif state.board.is_table(landing):
 		dest.y = BoardView.TABLE_HEIGHT
-	await fx.throw_projectile(key, from, dest, clampf(0.28 + 0.035 * float(r["distance"]), 0.3, 0.75))
+	await fx.throw_projectile(key, from, dest, clampf(0.4 + 0.05 * float(r["distance"]), 0.45, 1.0))
 	var info := fx.impact_info(key)
-	fx.onomatopoeia(info[0], dest + Vector3(0, 0.9, 0), 1.5 if victim != null else 1.1)
+	# Au-dessus de la tête de la victime, pour ne pas cacher son nom ni sa jauge.
+	fx.onomatopoeia(info[0], dest + Vector3(0, 2.3 if victim != null else 0.9, 0), 1.5 if victim != null else 1.1)
 	Sound.play("splat_sol", 0.0)
 	if not state.board.is_table(landing):
 		fx.floor_stain(info[1], BoardView.cell_to_world(landing), info[2])
 	_shake = 0.12 if victim != null else 0.05
 
 	if victim == null:
+		fx.floating_text("RATÉ !", dest + Vector3(0, 1.0, 0), Color("d8d8e0"), 72)
 		hud.dice.add_text("La nourriture s'écrase par terre.", 22)
 		hud.log_line("%s rate %s." % [_who(shooter), _who(target_unit)])
 		await _wait(0.35 * pace)
@@ -956,7 +1041,7 @@ func _play_shot(e: Dictionary) -> void:
 	else:
 		await hud.dice.roll(prefix, dmg, "= %d de moral" % dmg["total"], BD.YELLOW, 0.35 * pace)
 	fx.floating_text("-%d" % r["damage"], vp.head_position(), BD.YELLOW if r["damage"] < 10 else BD.RED, 84 if r["damage"] < 10 else 110)
-	hud.log_line("%s → %s : [b]-%d[/b] (%s)" % [_who(shooter), _who(victim), r["damage"], r["projectile_name"]])
+	hud.log_line("%s touche %s : [b]-%d[/b] (%s)" % [_who(shooter), _who(victim), r["damage"], r["projectile_name"]])
 	vp.refresh()
 	if r.get("saturated", false):
 		Sound.play("beurk")
@@ -1158,7 +1243,7 @@ func _refresh_all() -> void:
 	_refresh_fog()
 	var human_turn := human_teams.has(state.current_team) and not over
 	hud.set_status(state, human_turn)
-	hud.set_unit(selected, state.data.ap_per_turn())
+	hud.set_unit(selected, state.data.ap_per_turn(), "" if human_turn or over else BD.team_name(state.current_team))
 	var roster: Array = []
 	for u in state.units:
 		if u.team == viewer_team and u.kind != Unit.Kind.CART and (u.kind == Unit.Kind.STUDENT or u.is_on_board()):
@@ -1179,6 +1264,8 @@ func _refresh_fog() -> void:
 		var p: PawnView = pawns[id]
 		p.shown = Visibility.unit_visible(state, viewer_team, p.unit)
 		p.refresh()
+		if p == _hovered:
+			p.set_hover(true, _hover_text(p.unit))
 
 
 func _who(u: Unit) -> String:
@@ -1195,13 +1282,37 @@ func _who(u: Unit) -> String:
 	return "%s (%s)" % [u.name, BD.TEAM_NAMES[u.team % BD.TEAM_NAMES.size()]] if u.team >= 0 else u.name
 
 
+## Chance de toucher en mots (le joueur ne voit pas de pourcentage, seulement un ordre d'idée).
+func _chance_word(shooter: Unit, dist: int) -> String:
+	var p := 0.0
+	var pick := _odds.sum_distribution(2)
+	for roll in pick.keys():
+		var cx := int(state.data.projectile(str(roll))["cx"])
+		if watering:
+			cx = Combat.min_cx(state, true)
+		p += pick[roll] * _odds.chance_at_least(shooter.dex_d6, shooter.dex_bonus, dist + cx)
+	if p >= 0.85:
+		return "presque sûr"
+	if p >= 0.55:
+		return "bonnes"
+	if p >= 0.25:
+		return "moyennes"
+	return "faibles"
+
+
 func _reason_text(reason: String) -> String:
 	match reason:
-		"deja_tire": return "Déjà tiré ce tour."
-		"pas_assez_de_pa": return "Pas assez de PA pour tirer (4)."
+		"deja_tire":
+			if selected != null and _pushed_this_turn.has(selected.id):
+				return _pushed_this_turn[selected.id]
+			return "Déjà tiré ce tour."
+		"pas_assez_de_pa": return "Pas assez de PA pour tirer (%d)." % state.data.ap_cost("tir")
+		"cible_saturee": return "Déjà saturé : il file vers la sortie."
+		"hors_de_portee":
+			return "Hors de portée : %d au plus aux dés de %s." % [Combat.max_roll(selected), selected.name] if selected != null else "Hors de portée."
 		"pas_de_munitions": return "Pas de munition : va au contact d'une table garnie, d'un bac ou d'un chariot."
 		"mur": return "Un mur bloque la trajectoire."
-		"trop_loin": return "Trop loin pour arroser (5 cases max)."
+		"trop_loin": return "Trop loin pour arroser (%d cases max)." % int(state.data.projectile("robinet")["portee_max"])
 		"pas_de_robinet": return "Il faut être au contact d'un robinet pour arroser."
 		"ne_tire_pas": return "Ce personnage ne tire pas."
 		"cible_invalide": return "Cible impossible."

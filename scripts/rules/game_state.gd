@@ -20,6 +20,9 @@ var cook_awake := false
 var options: Dictionary = {}
 ## Bandes jouées par l'ordinateur (numéros).
 var ai_teams: Array[int] = []
+## Points de chahut par bande : moral réellement enlevé aux élèves des autres bandes.
+## Départage les bandes à la sonnerie, pour qu'une bande qui se cache ne gagne pas.
+var chahut: Dictionary = {}
 
 var _next_id := 1
 
@@ -151,6 +154,13 @@ func must_leave_table(u: Unit) -> bool:
 
 
 ## Retire du moral ; à 0, le pion est saturé et un prof relâche ses victimes.
+## Compte le chahut d'une bande qui touche un élève d'une autre bande.
+func score_hit(shooter_team: int, victim: Unit, moral_lost: int) -> void:
+	if shooter_team == Unit.NO_TEAM or victim.kind != Unit.Kind.STUDENT or victim.rallied or victim.team == shooter_team:
+		return
+	chahut[shooter_team] = int(chahut.get(shooter_team, 0)) + moral_lost
+
+
 func apply_damage(u: Unit, amount: int) -> bool:
 	u.moral = maxi(0, u.moral - amount)
 	if u.moral > 0:
@@ -229,10 +239,10 @@ func outcome() -> Dictionary:
 		return {"over": true, "winner": alive[0], "reason": "dernier"}
 	if turn > max_turns():
 		var best := -1
-		var best_key := [-1, -1]
+		var best_key := [-1, -1, -1]
 		var tie := false
 		for t in alive:
-			var key := [team_moral(t), students_left(t).size()]
+			var key := [int(chahut.get(t, 0)), team_moral(t), students_left(t).size()]
 			if key > best_key:
 				best_key = key
 				best = t

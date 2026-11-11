@@ -111,15 +111,26 @@ func _build_top() -> void:
 	_speed_button.toggle_mode = true
 	_speed_button.tooltip_text = "Accélérer les animations et les dés (V)"
 	_speed_button.toggled.connect(func(on):
-		_speed_button.text = "VITESSE ×2" if on else "VITESSE ×1"
+		_speed_button.text = "VITESSE ×3" if on else "VITESSE ×1"
 		speed_toggled.emit(on))
 	row.add_child(_speed_button)
 	var help_btn := BD.sticker("?", Color("2f9e8f"), 22)
 	help_btn.tooltip_text = "Comment jouer (F1)"
 	help_btn.pressed.connect(toggle_help)
 	row.add_child(help_btn)
+	# Un premier clic demande confirmation : la partie en cours serait perdue.
 	var menu_btn := BD.sticker("MENU", Color("6b6b6b"), 20)
-	menu_btn.pressed.connect(func(): menu_pressed.emit())
+	menu_btn.tooltip_text = "Quitter la partie (deux clics)"
+	menu_btn.pressed.connect(func():
+		if menu_btn.text == "QUITTER ?":
+			menu_pressed.emit()
+			return
+		menu_btn.text = "QUITTER ?"
+		menu_btn.modulate = Color(1.3, 0.8, 0.8)
+		get_tree().create_timer(3.0, true, false, true).timeout.connect(func():
+			if is_instance_valid(menu_btn):
+				menu_btn.text = "MENU"
+				menu_btn.modulate = Color.WHITE))
 	row.add_child(menu_btn)
 	var pad2 := Control.new()
 	pad2.custom_minimum_size = Vector2(10, 0)
@@ -265,13 +276,24 @@ func _build_bottom() -> void:
 
 
 func _build_hint() -> void:
-	_hint = BD.label("", 28, Color.WHITE)
+	_hint = BD.label("", 26, BD.INK)
+	var strip := StyleBoxFlat.new()
+	strip.bg_color = Color("fffbea")
+	strip.border_color = BD.INK
+	strip.set_border_width_all(3)
+	strip.set_corner_radius_all(6)
+	strip.content_margin_left = 16
+	strip.content_margin_right = 16
+	strip.content_margin_top = 2
+	strip.content_margin_bottom = 2
+	_hint.add_theme_stylebox_override("normal", strip)
 	_hint.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	_hint.offset_bottom = -250
 	_hint.offset_top = -292
 	_hint.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	BD.outline(_hint, 10)
+	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hint.visible = false
 	_root.add_child(_hint)
 
 
@@ -296,7 +318,7 @@ func _build_help() -> void:
 	BD.content(sheet).add_child(col)
 	col.add_child(BD.label("COMMENT JOUER", 54, BD.RED, true))
 	var lines := [
-		"But : être la dernière bande dans la cantine. À la sonnerie (tour 12), la bande qui garde le plus de moral gagne.",
+		"But : être la dernière bande dans la cantine. À la sonnerie (tour 12), la bande qui a le plus chahuté les autres (moral qu'elle leur a fait perdre) gagne.",
 		"Clic sur un de tes élèves pour le choisir (ou Tab), clic sur une case verte pour y aller : 1 PA par case, 12 PA par tour. Cases rouges : à portée d'un prof ou du cuisinier.",
 		"Clic sur un adversaire pour lui lancer ce qui te tombe sous la main : 4 PA, une fois par tour. Deux dés désignent le projectile.",
 		"Pour toucher, les dés de dextérité doivent atteindre la distance + la difficulté (CX) du projectile. Plus tu es près, mieux c'est.",
@@ -307,7 +329,7 @@ func _build_help() -> void:
 		"Neutre touché : sur 1 il te rejoint, sur 6 il devient berserk, sinon il s'enfuit.",
 		"Clic sur une table au contact pour grimper dessus (tout le tour). Clic sur un chariot au contact pour le pousser de 3 cases.",
 		"Caméra : clic droit pour tourner, Q et E par crans, molette pour zoomer, flèches ou clic molette pour se déplacer.",
-		"Entrée : fin du tour.  R : arroser au robinet.  P : projeter.  V : vitesse.  Échap : désélectionner.",
+		"Entrée : fin du tour.  R : arroser au robinet.  P : projeter.  V : vitesse.  Espace : accélérer le tour des autres.  Échap : désélectionner.",
 	]
 	for line in lines:
 		var l := BD.label("•  " + line, 25)
@@ -339,19 +361,20 @@ func set_status(state: GameState, human_turn: bool) -> void:
 		_ammo_label.add_theme_color_override("font_color", BD.RED)
 	var parts := []
 	for t in state.team_count:
-		parts.append("%s : %d élève%s, moral %d" % [BD.TEAM_NAMES[t].capitalize(), state.students_left(t).size(), "s" if state.students_left(t).size() > 1 else "", state.team_moral(t)])
+		parts.append("%s : %d élève%s, moral %d, chahut %d" % [BD.TEAM_NAMES[t].capitalize(), state.students_left(t).size(), "s" if state.students_left(t).size() > 1 else "", state.team_moral(t), int(state.chahut.get(t, 0))])
 	_score_label.text = "   •   ".join(parts)
 	_end_button.disabled = not human_turn
 
 
-func set_unit(u: Unit, max_ap: int) -> void:
+## `playing` : nom de la bande qui joue quand ce n'est pas au joueur (ordinateur, profs).
+func set_unit(u: Unit, max_ap: int, playing: String = "") -> void:
 	if u == null:
 		_card.modulate = Color(1, 1, 1, 0.55)
 		_portrait.texture = null
-		_name_label.text = "Choisis un élève"
+		_name_label.text = "Choisis un élève" if playing == "" else playing.to_upper() + " JOUE…"
 		_moral_bar.value = 0
 		_moral_label.text = ""
-		_info_label.text = "Clique sur un de tes pions, ou appuie sur Tab."
+		_info_label.text = "Clique sur un de tes pions, ou appuie sur Tab." if playing == "" else "Regarde bien : ton tour arrive."
 		_fill_ap(0, 0)
 		return
 	_card.modulate = Color.WHITE
@@ -480,6 +503,7 @@ func set_roster(units: Array, selected: Unit) -> void:
 
 func set_hint(text: String) -> void:
 	_hint.text = text
+	_hint.visible = text != ""
 
 
 func set_watering(on: bool) -> void:
@@ -494,7 +518,7 @@ func set_actions(can_water: bool, can_project: bool, human_turn: bool) -> void:
 
 func set_fast(on: bool) -> void:
 	_speed_button.set_pressed_no_signal(on)
-	_speed_button.text = "VITESSE ×2" if on else "VITESSE ×1"
+	_speed_button.text = "VITESSE ×3" if on else "VITESSE ×1"
 
 
 func log_line(text: String) -> void:

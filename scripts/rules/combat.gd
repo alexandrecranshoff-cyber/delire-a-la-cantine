@@ -21,6 +21,8 @@ static func cannot_shoot_reason(state: GameState, shooter: Unit, target: Unit, w
 		return "cible_invalide"
 	if target.status == Unit.Status.CAPTURED:
 		return "cible_invalide"
+	if target.status == Unit.Status.SATURATED:
+		return "cible_saturee"
 	if watering:
 		if not state.is_near_tap(shooter):
 			return "pas_de_robinet"
@@ -30,7 +32,24 @@ static func cannot_shoot_reason(state: GameState, shooter: Unit, target: Unit, w
 		return "pas_de_munitions"
 	if Trajectory.blocked_by_wall(state.board, shooter.pos, target.pos):
 		return "mur"
+	if max_roll(shooter) < Board.distance(shooter.pos, target.pos) + min_cx(state, watering):
+		return "hors_de_portee"
 	return ""
+
+
+## Plus haut total possible aux dés d'adresse du tireur.
+static func max_roll(shooter: Unit) -> int:
+	return shooter.dex_d6 * 6 + shooter.dex_bonus
+
+
+## Plus petite complexité parmi les projectiles qu'on peut tirer (ou celle de l'arrosage).
+static func min_cx(state: GameState, watering: bool) -> int:
+	if watering:
+		return int(state.data.projectile("robinet")["cx"])
+	var best := 1 << 30
+	for roll in range(2, 13):
+		best = mini(best, int(state.data.projectile(str(roll))["cx"]))
+	return best
 
 
 static func shot_threshold(distance: int, cx: int) -> int:
@@ -76,7 +95,9 @@ static func resolve_shot(state: GameState, shooter: Unit, target: Unit, watering
 	var dmg := state.dice.roll_damage(proj["degats"])
 	report["damage_roll"] = dmg
 	report["damage"] = dmg["total"]
+	var before := victim.moral
 	report["saturated"] = state.apply_damage(victim, dmg["total"])
+	state.score_hit(shooter.team, victim, before - victim.moral)
 	report["neutral_reaction"] = NeutralReaction.NONE
 	if victim.kind == Unit.Kind.NEUTRAL and not report["saturated"] and victim.status == Unit.Status.ACTIVE:
 		report["neutral_reaction"] = neutral_hit(state, victim, shooter)

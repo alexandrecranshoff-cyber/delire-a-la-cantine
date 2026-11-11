@@ -28,11 +28,12 @@ Choix faits pour la version jouable du niveau 1. Les valeurs sont dans `data/reg
 | Entrée des profs | Un prof entre tous les `prof_periode` tours de bande (livret : 1). Réglé par la difficulté : 3, 2 ou 1. | Dosage de la pression. |
 | Cible d'un prof | L'élève actif le plus proche en pas de marche, neutres ralliés compris. Il ne tente que la prise simple. | « l'élève actif (non neutre) le plus proche » ; la double prise reste disponible dans le moteur. |
 | Cuisinier | Il ne quitte pas la cuisine. Réveillé, il plonge l'élève au contact près d'un bac, sinon il tire s'il a des munitions sous la main. | Le livret ne dit pas s'il sort. |
-| Sonnerie | À la fin du tour 12 (`tours_max`), la bande qui garde le plus de moral gagne, puis celle qui a le plus d'élèves ; égalité possible. | Borne la partie à 30 à 60 minutes. |
+| Sonnerie | À la fin du tour 12 (`tours_max`), la bande qui a fait perdre le plus de moral aux élèves des autres bandes (le « chahut ») gagne, puis celle qui garde le plus de moral, puis celle qui a le plus d'élèves ; égalité possible. Toucher un neutre ou un élève rallié ne compte pas. | Borne la partie à 30 à 60 minutes, et une bande qui se cache sans tirer ne peut plus gagner à la sonnerie (relevé par l'essai de jeu). |
 | Neutre rallié | 7 PA par tour (`pa_neutre_rallie`) : 3 cases et un tir. | Potentiel 3 du livret, traduit en PA. |
 | Neutres au tour 5 | Les neutres encore à table partent vers la porte la plus proche, 3 cases par tour de bande. | « déroulement de la partie » |
 | Berserk | À chaque tour de bande, il tire sur le pion visible le plus proche, quel qu'il soit, puis s'en rapproche. | « tire sur n'importe qui » |
 | Brouillard | Une bande voit ce que voient ses élèves ; seuls les murs cachent, comme ils arrêtent les tirs. | Game design. |
+| Tir hors de portée | On ne peut pas viser une cible plus loin que le plus haut total des dés d'adresse du tireur (distance + plus petite CX), ni un élève saturé. | Évite des tirs perdus d'avance ; relevé par l'essai de jeu. |
 | Difficulté du solo | Trois niveaux : fréquence des profs, moral de départ et finesse de l'adversaire. Aucun dé truqué. | Demande du 10 novembre 2026. |
 | Cases rouges | Les cases à portée d'un prof libre ou du cuisinier (son déplacement plus le contact) sont signalées. | Lisibilité : le joueur voit le risque avant de s'engager. |
 

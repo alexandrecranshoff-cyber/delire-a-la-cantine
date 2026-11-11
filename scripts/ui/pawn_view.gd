@@ -14,9 +14,12 @@ const SHADOW_DIR := Vector3(0.94, 0.0, -0.34)
 const LEAN := 0.22  # le carton penche un peu vers la caméra pour rester lisible vu de haut
 ## Angle à ajouter si un modèle ne regarde pas vers +Z (les nôtres sont remis de face avant le squelette).
 const MODEL_YAW := 0.0
-const OUTLINE_WIDTH := 0.014
+## Épaisseur du contour pour 1 m de zoom (hauteur de vue) : elle suit le zoom pour garder
+## environ 2 px à l'écran quelle que soit la distance.
+const OUTLINE_PER_ZOOM := 0.0011
 const THROW_SPEED := 2.2
-const THROW_RELEASE := 0.42   # fraction du geste où la main lâche le projectile
+const THROW_RELEASE := 0.42
+const THROW_END := 0.6        # fraction du geste où l'on revient au repos   # fraction du geste où la main lâche le projectile
 
 static var _blob: Texture2D
 
@@ -37,7 +40,9 @@ var _ring := MeshInstance3D.new()
 var _bar_back := MeshInstance3D.new()
 var _bar_fill := MeshInstance3D.new()
 var _bar_mat := StandardMaterial3D.new()
+var _gauge_back_mat: StandardMaterial3D
 var _label := Label3D.new()
+var _cart_mat: StandardMaterial3D   # chariot : assombri quand il est dans le brouillard
 var _stains := Node3D.new()
 var _anim: AnimationPlayer
 var _is_model := false
@@ -46,6 +51,12 @@ var _cam_angle := 45.0
 var _look := {}
 var _bob := 0.0
 var _turn: Tween
+var _outline_w := 0.019
+var _ink := BD.INK                # couleur du contour hors sélection (couleur de bande pour les élèves)
+var _base: MeshInstance3D
+var _rim: MeshInstance3D
+var _team_ring := MeshInstance3D.new()   # anneau de bande visible à travers tables et voisins
+var _team_ring_mat := StandardMaterial3D.new()
 var _action := 0                  # numéro de l'animation en cours, pour ne pas couper la suivante
 
 
@@ -80,7 +91,7 @@ func _setup_model(scene: PackedScene) -> void:
 	_body.add_child(model)
 	_material.shader = MODEL_SHADER
 	_outline.shader = OUTLINE_SHADER
-	_outline.set_shader_parameter("width", OUTLINE_WIDTH)
+	_outline.set_shader_parameter("width", _outline_w)
 	_material.next_pass = _outline
 	var skin_mesh: MeshInstance3D = null
 	for node in model.find_children("*", "MeshInstance3D", true, false):
@@ -109,6 +120,8 @@ func _setup_cart() -> void:
 	var food := Color("a5c94f") if unit.name.contains("pur") else Color("cf7a33")
 	var mi := MeshInstance3D.new()
 	mi.mesh = Props.cart(food)
+	_cart_mat = Props.material().duplicate()
+	mi.material_override = _cart_mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_body.add_child(mi)
 	_height = 1.05
@@ -202,6 +215,7 @@ func _setup_blob(radius: float) -> void:
 
 func _setup_base() -> void:
 	var base := MeshInstance3D.new()
+	_base = base
 	var cyl := CylinderMesh.new()
 	cyl.top_radius = 0.4
 	cyl.bottom_radius = 0.42
@@ -214,6 +228,7 @@ func _setup_base() -> void:
 	base.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(base)
 	var rim := MeshInstance3D.new()
+	_rim = rim
 	var rim_mesh := CylinderMesh.new()
 	rim_mesh.top_radius = 0.47
 	rim_mesh.bottom_radius = 0.47
@@ -227,6 +242,24 @@ func _setup_base() -> void:
 	rim.position.y = 0.025
 	rim.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(rim)
+	# Anneau fin à la couleur de la bande, dessiné par-dessus le décor : on sait à qui est un
+	# élève même quand une table ou un voisin cache son socle.
+	var ring := TorusMesh.new()
+	ring.inner_radius = 0.44
+	ring.outer_radius = 0.5
+	ring.rings = 24
+	ring.ring_segments = 4
+	_team_ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_team_ring_mat.no_depth_test = true
+	_team_ring_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_team_ring_mat.render_priority = 2
+	ring.material = _team_ring_mat
+	_team_ring.mesh = ring
+	_team_ring.scale = Vector3(1, 0.2, 1)
+	_team_ring.position.y = 0.04
+	_team_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_team_ring.visible = false
+	add_child(_team_ring)
 
 
 func _setup_ring() -> void:
@@ -254,6 +287,7 @@ func _setup_gauge() -> void:
 	var back_mat := StandardMaterial3D.new()
 	back_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	back_mat.albedo_color = BD.INK
+	_gauge_back_mat = back_mat
 	back_mat.no_depth_test = true
 	back_mat.render_priority = 5
 	back.material = back_mat
@@ -301,12 +335,31 @@ func refresh() -> void:
 	_lift.scale = Vector3.ONE
 	_lift.rotation.z = 0.0
 	var team_col := BD.team_color(unit.team if (unit.kind == Unit.Kind.STUDENT or unit.rallied) else -1)
+	# Profs : violet, une couleur qu'aucune bande ne porte, pour les repérer d'un coup d'œil.
 	if unit.kind == Unit.Kind.TEACHER:
-		team_col = Color("8d8d8d")
+		team_col = BD.TEACHER_COLOR
 	elif unit.kind == Unit.Kind.COOK:
 		team_col = Color("ffffff")
 	_material.set_shader_parameter("border_color", team_col)
 	_base_mat.albedo_color = team_col
+	# Élèves : contour à la couleur de leur bande, pour savoir à qui est un pion même quand son
+	# socle est caché. Les autres gardent le trait d'encre, et les neutres un petit socle gris.
+	var is_team := unit.kind == Unit.Kind.STUDENT or unit.rallied
+	_ink = team_col.darkened(0.15) if is_team else BD.INK
+	if _base != null:
+		var neutral := unit.kind == Unit.Kind.NEUTRAL and not unit.rallied
+		_base.scale = Vector3(0.72, 1, 0.72) if neutral else Vector3.ONE
+		_rim.scale = Vector3(0.66, 1, 0.66) if neutral else Vector3.ONE
+		if neutral:
+			team_col = Color("b9b4c4")
+	var adult := unit.kind == Unit.Kind.TEACHER or unit.kind == Unit.Kind.COOK
+	_team_ring.visible = (is_team or adult) and unit.kind != Unit.Kind.CART
+	_team_ring_mat.albedo_color = Color(team_col, 0.62)
+	if _gauge_back_mat != null:
+		_gauge_back_mat.albedo_color = team_col.darkened(0.25) if is_team else BD.INK
+	if _is_model and not _ring.visible:
+		_outline.set_shader_parameter("color", _ink)
+		_outline.set_shader_parameter("width", _outline_w * (1.4 if is_team else 1.0))
 	var tint := Color.WHITE
 	var amount := 0.0
 	match unit.status:
@@ -323,6 +376,8 @@ func refresh() -> void:
 			_lift.scale = Vector3.ONE * 0.8
 			_lift.rotation.z = 0.5
 			position += Vector3(0.45, 0.0, 0.2)
+	if _cart_mat != null:
+		_cart_mat.albedo_color = Color.WHITE if shown else Color(0.5, 0.5, 0.58)
 	_material.set_shader_parameter("tint", tint)
 	_material.set_shader_parameter("tint_amount", amount)
 	var spent := unit.is_controllable() and unit.kind != Unit.Kind.CART and unit.ap <= 0 and unit.has_shot
@@ -346,8 +401,8 @@ func set_selected(on: bool) -> void:
 	_label.modulate = BD.YELLOW
 	if _is_model:
 		# Le pion choisi respire et son contour passe au jaune.
-		_outline.set_shader_parameter("color", BD.YELLOW if on else BD.INK)
-		_outline.set_shader_parameter("width", OUTLINE_WIDTH * (1.7 if on else 1.0))
+		_outline.set_shader_parameter("color", BD.YELLOW if on else _ink)
+		_outline.set_shader_parameter("width", _outline_w * (1.7 if on else 1.4 if _ink != BD.INK else 1.0))
 		if _anim != null and _anim.current_animation in ["", "repos"]:
 			if on:
 				_anim.play("repos")
@@ -378,6 +433,17 @@ func set_facing(d: Vector2, instant: bool = false) -> void:
 
 
 ## Jauge, nom et cartons se tournent vers la caméra (autour de la verticale seulement).
+## Le contour suit le zoom de la caméra pour garder la même épaisseur à l'écran.
+func set_zoom(zoom: float) -> void:
+	var w := zoom * OUTLINE_PER_ZOOM
+	if absf(w - _outline_w) < 0.0005:
+		return
+	_outline_w = w
+	if _is_model:
+		var team := _ink != BD.INK
+		_outline.set_shader_parameter("width", _outline_w * (1.7 if _ring.visible else 1.4 if team else 1.0))
+
+
 func face_camera(angle_deg: float) -> void:
 	_cam_angle = angle_deg
 	_pivot.rotation.y = deg_to_rad(angle_deg)
@@ -426,9 +492,9 @@ func _process(delta: float) -> void:
 func _rest_pose() -> void:
 	if _anim == null or not _anim.has_animation("repos"):
 		return
-	_anim.play("repos")
+	# Tout le monde respire doucement, chacun à son rythme, pour que la salle ne soit pas figée.
+	_anim.play("repos", 0.25, 0.55 + fmod(unit.id * 0.13, 0.3))
 	_anim.seek(fmod(unit.id * 0.37, _anim.get_animation("repos").length), true)
-	_anim.pause()
 
 
 ## Marche sur place pendant que le jeu déplace le pion.
@@ -445,7 +511,8 @@ func walk(on: bool) -> void:
 
 
 ## Joue une animation une fois, puis revient au repos.
-func _play_once(clip: String, speed: float, from: float = 0.0) -> void:
+## `until` : fraction du clip où l'on s'arrête pour revenir au repos en fondu.
+func _play_once(clip: String, speed: float, from: float = 0.0, until: float = 1.0) -> void:
 	if _anim == null or not _anim.has_animation(clip):
 		return
 	_action += 1
@@ -453,10 +520,10 @@ func _play_once(clip: String, speed: float, from: float = 0.0) -> void:
 	_anim.play(clip, 0.08, speed)
 	if from > 0.0:
 		_anim.seek(from, true)
-	await get_tree().create_timer((_anim.get_animation(clip).length - from) / speed, false).timeout
+	await get_tree().create_timer((_anim.get_animation(clip).length * until - from) / speed, false).timeout
 	if mine == _action and is_inside_tree():
-		if _ring.visible:
-			_anim.play("repos", 0.2)
+		if _ring.visible or until < 1.0:
+			_anim.play("repos", 0.25)
 		else:
 			_rest_pose()
 
@@ -467,7 +534,9 @@ func throw_anim() -> void:
 		hop(0.3)
 		return
 	var length := _anim.get_animation("lancer").length
-	_play_once("lancer", THROW_SPEED)
+	# La fin du clip fait basculer le lanceur presque à l'horizontale : vu de haut, on dirait une
+	# chute. On s'arrête juste après le lâcher.
+	_play_once("lancer", THROW_SPEED, 0.0, THROW_END)
 	await get_tree().create_timer(length * THROW_RELEASE / THROW_SPEED, false).timeout
 
 

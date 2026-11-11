@@ -17,8 +17,6 @@ var level: Level
 var _sides := {}               # "N" -> {"tall": Node3D, "low": Node3D, "lowered": bool}
 var _door_plates: Array = []   # [Label3D, côté]
 var _table_sets: Array[MultiMeshInstance3D] = []   # couverts : disparaissent quand les tables sont vides
-var _fog := MultiMeshInstance3D.new()
-var _fog_mesh := MultiMesh.new()
 var _cam_angle := 45.0
 var _rng := RandomNumberGenerator.new()
 
@@ -33,6 +31,7 @@ func build(p_board: Board, p_level: Level) -> void:
 		add_child(tall)
 		add_child(low)
 		_sides[key] = {"tall": tall, "low": low, "lowered": false}
+	_build_backdrop()
 	_build_floor()
 	_build_walls()
 	_build_wall_decor()
@@ -124,6 +123,23 @@ func _plate(text: String, pos: Vector3, color: Color, size: int = 64) -> Label3D
 
 
 # --- Sol ------------------------------------------------------------------------
+
+## Grand plan sous la salle, pour que le plateau ne flotte pas dans un aplat uni.
+func _build_backdrop() -> void:
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(board.width + 120, board.height + 120)
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/fond.gdshader")
+	var c := Vector3(board.width / 2.0 - 0.5, 0, board.height / 2.0 - 0.5)
+	mat.set_shader_parameter("center", c)
+	mat.set_shader_parameter("half_size", Vector2(board.width / 2.0 + 0.5, board.height / 2.0 + 0.5))
+	plane.material = mat
+	var mi := MeshInstance3D.new()
+	mi.mesh = plane
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = c + Vector3(0, -0.06, 0)
+	add_child(mi)
+
 
 func _build_floor() -> void:
 	var room := []
@@ -260,14 +276,53 @@ func _build_walls() -> void:
 			_multimesh(_box(Vector3(1.0, 0.03, 1.0), top), tops, false, pair[1])
 	# Cloison entre la salle et la cuisine : le comptoir du self, garni de vaisselle propre.
 	_multimesh(Props.counter(COUNTER_HEIGHT), counters)
-	var deco := [Props.tray_stack(), Props.plates(), Props.pitcher(), Props.plates(), Props.basket()]
-	var run := 0
+	# Le self est garni sur toute sa longueur : bacs de plats du jour, piles d'assiettes et de plateaux.
+	var deco := [Props.gastro(Color("a5c94f")), Props.plates(), Props.gastro(Color("e08a3a")), Props.tray_stack(),
+		Props.gastro(Color("f2e2b0")), Props.pitcher(), Props.gastro(Color("c9452f")), Props.basket()]
 	for i in counters.size():
 		var pos: Vector3 = counters[i].origin
-		var next_to: bool = i + 1 < counters.size() and counters[i + 1].origin.distance_to(pos) < 1.01
-		run = run + 1 if next_to else 0
-		if run > 0 and run % 3 == 2:
-			_mesh_at(deco[(run / 3) % deco.size()], pos + Vector3(0, COUNTER_HEIGHT + 0.06, 0), _rng.randf_range(-0.2, 0.2))
+		if i % 6 == 5:
+			continue  # un vide de temps en temps, pour ne pas faire un mur d'objets
+		_mesh_at(deco[i % deco.size()], pos + Vector3(0, COUNTER_HEIGHT + 0.06, 0), _rng.randf_range(-0.15, 0.15))
+	_build_kitchen_clutter(lists)
+
+
+## Cuisine : taches de graisse au sol et marmites posées sur les murets abaissés, pour qu'elle
+## reste habitée vue de l'angle par défaut (ses murs côté caméra sont abaissés).
+func _build_kitchen_clutter(lists: Dictionary) -> void:
+	var gradient := Gradient.new()
+	gradient.set_color(0, Color(0.32, 0.24, 0.1, 0.42))
+	gradient.set_color(1, Color(0.32, 0.24, 0.1, 0.0))
+	var tex := GradientTexture2D.new()
+	tex.gradient = gradient
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(0.5, 0.0)
+	tex.width = 64
+	tex.height = 64
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = tex
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	var plane := PlaneMesh.new()
+	plane.size = Vector2.ONE
+	plane.material = mat
+	var stains := []
+	for c in board.cells_of(Board.Terrain.KITCHEN):
+		if _rng.randf() < 0.22:
+			var s := _rng.randf_range(0.7, 1.6)
+			var basis := Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3(s, 1, s * _rng.randf_range(0.6, 1.0)))
+			stains.append(Transform3D(basis, cell_to_world(c, 0.012) + Vector3(_rng.randf_range(-0.3, 0.3), 0, _rng.randf_range(-0.3, 0.3))))
+	_multimesh(plane, stains, false)
+	var pots := [Props.stockpot(Props.INOX), Props.stockpot(Color("b9482f")), Props.plates(), Props.stockpot(Props.INOX_DARK)]
+	var k := 0
+	for side in SIDES.keys():
+		for c in lists[side][true]:
+			k += 1
+			if k % 3 != 0:
+				continue
+			_mesh_at(pots[(k / 3) % pots.size()], cell_to_world(c, WALL_LOW + 0.05), _rng.randf_range(0, TAU), _sides[side]["low"])
 
 
 ## Bande d'ombre en dégradé, posée au sol le long d'un mur (le mur est du côté -Z).
@@ -416,13 +471,23 @@ func _build_wall_decor() -> void:
 			_wall_sprite(side, "photo_classe", 1.3, 1.6, 0.6)
 		else:
 			_wall_sprite(side, "extincteur", split - 5.6, 0.95, 0.72, 0.05)
-		# Cuisine : une étagère de casseroles.
-		var kz := split + 1.0
-		if _wall_free(side, kz - 0.8, kz + 0.8):
-			_mesh_at(Props.shelf(1.8), _wall_point(side, kz, 1.5, 0.0), _wall_yaw(side), _sides[side]["tall"])
-	for x in [5.0, w - 6.0]:
+		# Cuisine : des étagères de casseroles, une sur deux plus haute, sans boucher les portes.
+		var k := 0
+		for kz: float in range(split + 1, h - 1, 3):
+			if _wall_free(side, kz - 0.8, kz + 0.8):
+				_mesh_at(Props.shelf(1.8), _wall_point(side, kz, 1.5 if k % 2 == 0 else 1.95, 0.0), _wall_yaw(side), _sides[side]["tall"])
+			# Entre deux étagères : louches et poêles pendues à une barre.
+			if kz + 1.5 < h - 1 and _wall_free(side, kz + 0.9, kz + 2.1):
+				_mesh_at(Props.utensil_rail(1.1), _wall_point(side, kz + 1.5, 1.95 if k % 2 == 0 else 1.55, 0.0), _wall_yaw(side), _sides[side]["tall"])
+			k += 1
+	for x in [5.0, 10.0, w - 11.0, w - 6.0]:
 		if _wall_free("S", x - 1.5, x + 1.5):
 			_mesh_at(Props.shelf(3.0), _wall_point("S", x, 1.5, 0.0), _wall_yaw("S"), _sides["S"]["tall"])
+			_mesh_at(Props.shelf(3.0), _wall_point("S", x, 2.05, 0.0), _wall_yaw("S"), _sides["S"]["tall"])
+	for x in [7.5, w - 8.5, mid]:
+		if _wall_free("S", x - 0.7, x + 0.7):
+			_mesh_at(Props.utensil_rail(1.3), _wall_point("S", x, 1.8, 0.0), _wall_yaw("S"), _sides["S"]["tall"])
+
 
 
 # --- Tables -----------------------------------------------------------------------
@@ -516,9 +581,20 @@ func _build_tables() -> void:
 		index += 1
 	_multimesh(_box(Vector3(0.09, TABLE_HEIGHT - 0.1, 0.09), _tiled("inox.png", Vector3(1, 1, 1))), legs)
 	for v in 3:
+		# Ordre mélangé : les plateaux qui restent après le tour 4 se répartissent sur toutes les tables.
+		_shuffle(trays[v])
 		_table_sets.append(_multimesh(Props.tray(v), trays[v], false))
+	_shuffle(pitchers)
 	_table_sets.append(_multimesh(Props.pitcher(), pitchers, false))
 	_table_sets.append(_multimesh(Props.basket(), baskets, false))
+
+
+func _shuffle(list: Array) -> void:
+	for i in range(list.size() - 1, 0, -1):
+		var j := _rng.randi_range(0, i)
+		var t = list[i]
+		list[i] = list[j]
+		list[j] = t
 
 
 ## Les tables se vident à la fin du tour 4 (livret) : plus de couverts, plus de munitions.
@@ -527,9 +603,11 @@ func set_tables_stocked(stocked: bool) -> void:
 		var mm := inst.multimesh
 		if stocked:
 			mm.visible_instance_count = -1
-		elif mm.visible_instance_count != 0:
+		elif mm.visible_instance_count == -1:
+			# Tables vidées : il reste quelques plateaux abandonnés, pas de grands aplats nus.
+			var left := int(mm.instance_count * 0.35)
 			var tw := create_tween()
-			tw.tween_method(func(v: int): mm.visible_instance_count = v, mm.instance_count, 0, 0.7)
+			tw.tween_method(func(v: int): mm.visible_instance_count = v, mm.instance_count, left, 0.7)
 
 
 # --- Portes -----------------------------------------------------------------------
@@ -655,30 +733,46 @@ func face_camera(angle_deg: float) -> void:
 
 
 # --- Brouillard -------------------------------------------------------------------
+## Deux voiles (sol et dessus des tables) lisent la même carte de visibilité, un texel par case :
+## les bords sont adoucis par le filtrage au lieu de carrés durs.
+
+const FOG_SHADER := preload("res://shaders/brouillard.gdshader")
+
+var _fog_image: Image
+var _fog_texture: ImageTexture
+var _fog_planes: Array[MeshInstance3D] = []
+
 
 func _build_fog() -> void:
-	var quad := PlaneMesh.new()
-	quad.size = Vector2(1.0, 1.0)
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color = Color(0.08, 0.06, 0.14, 0.55)
-	quad.material = mat
-	_fog_mesh.transform_format = MultiMesh.TRANSFORM_3D
-	_fog_mesh.mesh = quad
-	_fog.multimesh = _fog_mesh
-	_fog.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(_fog)
+	_fog_image = Image.create(board.width, board.height, false, Image.FORMAT_RG8)
+	_fog_texture = ImageTexture.create_from_image(_fog_image)
+	for layer in 2:
+		var plane := PlaneMesh.new()
+		plane.size = Vector2(board.width, board.height)
+		var mat := ShaderMaterial.new()
+		mat.shader = FOG_SHADER
+		mat.set_shader_parameter("hidden_map", _fog_texture)
+		mat.set_shader_parameter("channel", layer)
+		mat.render_priority = 1
+		plane.material = mat
+		var mi := MeshInstance3D.new()
+		mi.mesh = plane
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var h := 0.035 if layer == 0 else TABLE_HEIGHT + 0.3
+		mi.position = Vector3(board.width / 2.0 - 0.5, h, board.height / 2.0 - 0.5)
+		add_child(mi)
+		_fog_planes.append(mi)
 
 
-## Grise les cases que la bande ne voit pas.
+## Voile les cases que la bande ne voit pas.
 func set_fog(cells: Array) -> void:
-	_fog_mesh.instance_count = cells.size()
-	for i in cells.size():
-		var c: Vector2i = cells[i]
-		var h := 0.03
-		if board.is_table(c):
-			h = TABLE_HEIGHT + 0.36
-		elif board.is_tub(c):
-			h = 1.2
-		_fog_mesh.set_instance_transform(i, Transform3D(Basis(), cell_to_world(c, h)))
+	_fog_image.fill(Color(0, 0, 0))
+	for c in cells:
+		var cell: Vector2i = c
+		if not board.in_bounds(cell):
+			continue
+		if board.is_table(cell):
+			_fog_image.set_pixel(cell.x, cell.y, Color(0, 1, 0))
+		else:
+			_fog_image.set_pixel(cell.x, cell.y, Color(1, 0, 0))
+	_fog_texture.update(_fog_image)

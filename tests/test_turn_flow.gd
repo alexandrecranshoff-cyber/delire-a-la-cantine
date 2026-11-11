@@ -69,6 +69,28 @@ func test_sonnerie_la_bande_au_meilleur_moral_gagne() -> void:
 	assert_eq(o["winner"], 1, "Grobill (90) a plus de moral que Ledur (50)")
 
 
+func test_sonnerie_le_chahut_passe_avant_le_moral() -> void:
+	# Une bande qui se cache garde tout son moral mais ne marque rien : elle perd à la sonnerie.
+	var s := _two_teams()
+	var ledur: Unit = s.team_units(0)[0]
+	var grobill: Unit = s.team_units(1)[0]
+	var before := grobill.moral
+	s.apply_damage(grobill, 5)
+	s.score_hit(0, grobill, before - grobill.moral)
+	s.turn = s.max_turns() + 1
+	assert_eq(s.outcome()["winner"], 0, "Ledur a marqué 5 points de chahut, Grobill aucun")
+	assert_eq(int(s.chahut[0]), 5)
+	assert_true(ledur.moral < grobill.moral, "et cela malgré moins de moral")
+
+
+func test_chahut_ne_compte_pas_les_neutres_ni_sa_bande() -> void:
+	var s := _two_teams()
+	var n := s.add_unit(Unit.Kind.NEUTRAL, "neutre", Vector2i(5, 3), Unit.NO_TEAM)
+	s.score_hit(0, n, 4)
+	s.score_hit(0, s.team_units(0)[0], 4)
+	assert_eq(int(s.chahut.get(0, 0)), 0)
+
+
 func test_sonnerie_egalite() -> void:
 	var s := _two_teams()
 	s.team_units(1)[0].moral = 50
