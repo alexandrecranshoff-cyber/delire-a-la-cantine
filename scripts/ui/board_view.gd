@@ -414,11 +414,13 @@ func _build_wall_decor() -> void:
 			_wall_sprite(side, "photo_classe", 1.3, 1.6, 0.6)
 		else:
 			_wall_sprite(side, "extincteur", split - 5.6, 0.95, 0.72, 0.05)
-		# Cuisine : une étagère de casseroles.
-		var kz := split + 1.0
-		if _wall_free(side, kz - 0.8, kz + 0.8):
-			_mesh_at(Props.shelf(1.8), _wall_point(side, kz, 1.5, 0.0), _wall_yaw(side), _sides[side]["tall"])
-	for x in [5.0, w - 6.0]:
+		# Cuisine : des étagères de casseroles, une sur deux plus haute, sans boucher les portes.
+		var k := 0
+		for kz: float in range(split + 1, h - 1, 3):
+			if _wall_free(side, kz - 0.8, kz + 0.8):
+				_mesh_at(Props.shelf(1.8), _wall_point(side, kz, 1.5 if k % 2 == 0 else 1.95, 0.0), _wall_yaw(side), _sides[side]["tall"])
+			k += 1
+	for x in [5.0, 10.0, w - 11.0, w - 6.0]:
 		if _wall_free("S", x - 1.5, x + 1.5):
 			_mesh_at(Props.shelf(3.0), _wall_point("S", x, 1.5, 0.0), _wall_yaw("S"), _sides["S"]["tall"])
 
@@ -525,9 +527,11 @@ func set_tables_stocked(stocked: bool) -> void:
 		var mm := inst.multimesh
 		if stocked:
 			mm.visible_instance_count = -1
-		elif mm.visible_instance_count != 0:
+		elif mm.visible_instance_count == -1:
+			# Tables vidées : il reste quelques plateaux abandonnés, pas de grands aplats nus.
+			var left := int(mm.instance_count * 0.35)
 			var tw := create_tween()
-			tw.tween_method(func(v: int): mm.visible_instance_count = v, mm.instance_count, 0, 0.7)
+			tw.tween_method(func(v: int): mm.visible_instance_count = v, mm.instance_count, left, 0.7)
 
 
 # --- Portes -----------------------------------------------------------------------

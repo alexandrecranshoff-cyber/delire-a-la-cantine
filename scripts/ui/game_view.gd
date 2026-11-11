@@ -164,6 +164,7 @@ func _add_pawn(u: Unit) -> PawnView:
 		look = Vector2(state.board.width / 2.0 - u.pos.x, state.board.height / 2.0 - u.pos.y)
 	p.set_facing(look, true)
 	p.face_camera(_cam_angle)
+	p.set_zoom(_cam_zoom)
 	pawns[u.id] = p
 	return p
 
@@ -218,6 +219,7 @@ func _update_camera() -> void:
 	camera.look_at(_cam_target + shake, Vector3.UP)
 	for p in pawns.values():
 		p.face_camera(_cam_angle)
+		p.set_zoom(_cam_zoom)
 	if board_view != null:
 		board_view.face_camera(_cam_angle)
 	if fx != null:

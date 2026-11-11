@@ -15,7 +15,7 @@ const CLIPS := ["repos", "marche", "lancer", "touche"]
 const FPS := 20.0
 ## Bras rabattus le long du corps (en degrés) : le repos de la bibliothèque garde les bras écartés
 ## comme un mannequin. Appliqué au bras, à l'avant-bras et à la main, côté gauche et droit.
-const ARM_DROP := {"repos": 22.0}
+const ARM_DROP := {"repos": 32.0}
 const ARM_BONES := ["Arm", "ForeArm", "Hand"]
 
 

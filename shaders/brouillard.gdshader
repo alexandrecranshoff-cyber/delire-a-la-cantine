@@ -18,7 +18,7 @@ void vertex() {
 void fragment() {
 	vec4 m = texture(hidden_map, UV);
 	float raw = channel == 0 ? m.r : m.g;
-	float hidden = smoothstep(0.3, 0.7, raw);
+	float hidden = smoothstep(0.42, 0.72, raw);
 	if (hidden < 0.01) {
 		discard;
 	}
