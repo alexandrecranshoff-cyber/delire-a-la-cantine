@@ -1,8 +1,9 @@
 class_name PawnView
 extends Node3D
-## Pion d'un personnage : modèle 3D animé façon BD (contour à l'encre, ombrage en deux tons), posé
-## sur un socle de la couleur de sa bande, avec sa jauge de moral. Si le modèle d'un personnage
-## manque, on retombe sur le pion en carton à 5 vues (option C de la bible graphique).
+## Pion d'un personnage : modèle 3D animé façon BD (contour à l'encre, ombrage en deux tons), avec
+## sa jauge de moral. Les élèves portent des habits à la couleur de leur bande, et les projectiles
+## laissent des taches peintes sur leurs vêtements. Si le modèle d'un personnage manque, on retombe
+## sur le pion en carton à 5 vues (option C de la bible graphique), posé sur un socle de couleur.
 ## Les chariots sont des objets 3D étiquetés, toujours visibles.
 
 const CARD_SHADER := preload("res://shaders/pion.gdshader")
@@ -19,7 +20,15 @@ const MODEL_YAW := 0.0
 const OUTLINE_PER_ZOOM := 0.0011
 const THROW_SPEED := 2.2
 const THROW_RELEASE := 0.42
-const THROW_END := 0.6        # fraction du geste où l'on revient au repos   # fraction du geste où la main lâche le projectile
+const THROW_END := 0.6        # fraction du geste où l'on revient au repos
+## Taches peintes sur le modèle : nombre de projectiles gardés, et gouttes autour de chacun.
+const MAX_HITS := 5
+const DROPS := 3
+## Couleur de la nourriture, d'après l'image de tache au sol choisie par Effects.
+const STAIN_COLORS := {
+	"tache_creme": Color("f6e6b4"), "tache_marron": Color("8a4f22"),
+	"tache_verte": Color("86ad3c"), "tache_orange": Color("ef6a12"),
+}
 
 static var _blob: Texture2D
 
@@ -58,6 +67,13 @@ var _rim: MeshInstance3D
 var _team_ring := MeshInstance3D.new()   # anneau de bande visible à travers tables et voisins
 var _team_ring_mat := StandardMaterial3D.new()
 var _action := 0                  # numéro de l'animation en cours, pour ne pas couper la suivante
+var _skin_mesh: MeshInstance3D    # maillage du modèle, pour placer les taches
+var _stain_points := PackedVector3Array()
+var _stain_normals := PackedVector3Array()
+var _stain_bones := PackedInt32Array()
+var _skeleton: Skeleton3D
+var _hits: Array[Array] = []      # par projectile : liste de [centre, rayon, couleur, normale, graine]
+var _cloth := {}                  # masque d'habits du personnage (vide : pas d'habits de bande)
 
 
 func setup(p_unit: Unit) -> void:
@@ -76,7 +92,7 @@ func setup(p_unit: Unit) -> void:
 		_setup_model(scene)
 	else:
 		_setup_card()
-	if unit.kind != Unit.Kind.CART:
+	if unit.kind != Unit.Kind.CART and not _is_model:
 		_setup_base()
 	_setup_ring()
 	_setup_gauge()
@@ -99,6 +115,13 @@ func _setup_model(scene: PackedScene) -> void:
 		var source := mi.get_active_material(0) as BaseMaterial3D
 		if source != null and source.albedo_texture != null:
 			_material.set_shader_parameter("albedo_tex", source.albedo_texture)
+		if mi.mesh != null:
+			var painted := GameAssets.stain_mesh(str(_look["image"]), mi.mesh)
+			mi.mesh = painted["mesh"]
+			_stain_points = painted["points"]
+			_stain_normals = painted["normales"]
+			_stain_bones = painted["os"]
+			_skin_mesh = mi
 		mi.material_override = _material
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		if mi.skin != null:
@@ -106,14 +129,17 @@ func _setup_model(scene: PackedScene) -> void:
 	var skeletons := model.find_children("*", "Skeleton3D", true, false)
 	if skin_mesh != null and not skeletons.is_empty():
 		var skeleton: Skeleton3D = skeletons[0]
+		_skeleton = skeleton
 		var library := GameAssets.animations_for(str(_look["image"]), skeleton, skin_mesh.skin, model.get_path_to(skeleton))
 		_anim = AnimationPlayer.new()
 		model.add_child(_anim)
 		_anim.add_animation_library("", library)
 		_rest_pose()
+	_cloth = GameAssets.clothes(str(_look["image"]))
+	if not _cloth.is_empty():
+		_material.set_shader_parameter("cloth_mask", _cloth["masque"])
+		_material.set_shader_parameter("cloth_ref", _cloth["ref"])
 	_setup_blob(0.36 if _height < 1.7 else 0.5)
-	_stains.position = Vector3(0, _height * 0.56, 0.3)
-	_pivot.add_child(_stains)
 
 
 func _setup_cart() -> void:
@@ -341,7 +367,6 @@ func refresh() -> void:
 	elif unit.kind == Unit.Kind.COOK:
 		team_col = Color("ffffff")
 	_material.set_shader_parameter("border_color", team_col)
-	_base_mat.albedo_color = team_col
 	# Élèves : contour à la couleur de leur bande, pour savoir à qui est un pion même quand son
 	# socle est caché. Les autres gardent le trait d'encre, et les neutres un petit socle gris.
 	var is_team := unit.kind == Unit.Kind.STUDENT or unit.rallied
@@ -353,7 +378,9 @@ func refresh() -> void:
 		if neutral:
 			team_col = Color("b9b4c4")
 	var adult := unit.kind == Unit.Kind.TEACHER or unit.kind == Unit.Kind.COOK
-	_team_ring.visible = (is_team or adult) and unit.kind != Unit.Kind.CART
+	# L'anneau vu à travers les tables n'accompagne que le socle des cartons : les modèles 3D
+	# portent la couleur de leur bande sur leurs habits.
+	_team_ring.visible = (is_team or adult) and unit.kind != Unit.Kind.CART and _base != null
 	_team_ring_mat.albedo_color = Color(team_col, 0.62)
 	if _gauge_back_mat != null:
 		_gauge_back_mat.albedo_color = team_col.darkened(0.25) if is_team else BD.INK
@@ -383,6 +410,10 @@ func refresh() -> void:
 	var spent := unit.is_controllable() and unit.kind != Unit.Kind.CART and unit.ap <= 0 and unit.has_shot
 	_material.set_shader_parameter("dim", 0.0)
 	_base_mat.albedo_color = team_col.darkened(0.45) if spent else team_col
+	# Habits : couleur franche de la bande, un peu éteinte quand l'élève a tout dépensé.
+	var dyed := is_team and not _cloth.is_empty()
+	_material.set_shader_parameter("cloth_amount", 1.0 if dyed else 0.0)
+	_material.set_shader_parameter("cloth_color", team_col.darkened(0.3) if spent else team_col)
 	var gauge := has_gauge()
 	_bar_back.visible = gauge
 	_bar_fill.visible = gauge
@@ -557,8 +588,12 @@ func hop(height: float = 0.35, time: float = 0.22) -> void:
 	tw.tween_property(_lift, "position:y", 0.0, time * 0.5).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
 
 
-## La tache reste collée au personnage jusqu'à la fin du service.
-func add_stain(tex: Texture2D, color: Color = Color.WHITE) -> void:
+## La tache reste sur le personnage jusqu'à la fin du service. Sur un modèle 3D, elle est peinte
+## sur le vêtement, du côté d'où vient le projectile (`from` : position du lanceur dans le monde).
+func add_stain(tex: Texture2D, color: Color = Color.WHITE, from: Variant = null, kind: String = "") -> void:
+	if _is_model and _skin_mesh != null and not _stain_points.is_empty():
+		_paint_stain(STAIN_COLORS.get(kind, Color("f6e6b4")) * Color(color.r, color.g, color.b), color.a, from)
+		return
 	if tex == null or _stains.get_child_count() >= 5:
 		return
 	var s := Sprite3D.new()
@@ -572,6 +607,102 @@ func add_stain(tex: Texture2D, color: Color = Color.WHITE) -> void:
 	s.rotation.z = randf_range(-PI, PI)
 	s.render_priority = 2
 	_stains.add_child(s)
+
+
+## Choisit un point du corps tourné vers le lanceur (du ventre aux épaules surtout), y pose une
+## tache et quelques gouttes autour, puis envoie le tout au shader.
+func _paint_stain(col: Color, opacity: float, from: Variant) -> void:
+	# Le point visé est choisi d'après la pose du moment (os principal de chaque sommet) : la face
+	# du corps tournée vers le lanceur, sous la tête, de préférence au ventre et au torse.
+	var toward := Vector3.ZERO
+	if from is Vector3:
+		toward = ((from as Vector3) - body_position())
+		toward.y = 0.0
+		toward = toward.normalized()
+	var top := 0.0
+	for p in _stain_points:
+		top = maxf(top, p.y)
+	var best := -1
+	var best_score := -INF
+	for attempt in 64:
+		var i := randi() % _stain_points.size()
+		var p := _stain_points[i]
+		var h := p.y / maxf(0.01, top)
+		if h < 0.3 or h > 0.78:
+			continue
+		var score := randf() * 0.5 - absf(h - 0.56) * 1.5
+		if toward != Vector3.ZERO:
+			score += _posed_normal(i).dot(toward) * 2.0
+		if score > best_score:
+			best_score = score
+			best = i
+	if best < 0:
+		best = randi() % _stain_points.size()
+	var center := _stain_points[best]
+	var normal := _stain_normals[best].normalized()
+	var size := top * randf_range(0.08, 0.11)
+	var hit: Array = [[center, size, col, opacity, normal, randf() * 10.0]]
+	# Gouttes : projetées à côté de la tache principale, sur la même face du corps.
+	var tangent := normal.cross(Vector3.UP)
+	if tangent.length() < 0.1:
+		tangent = Vector3.RIGHT
+	tangent = tangent.normalized()
+	var bitangent := normal.cross(tangent).normalized()
+	for k in DROPS:
+		var ang := randf() * TAU
+		var dist := size * randf_range(1.15, 1.8)
+		var spot := center + (tangent * cos(ang) + bitangent * sin(ang)) * dist
+		var near := _closest_point(spot)
+		hit.append([_stain_points[near], size * randf_range(0.18, 0.32), col, opacity, _stain_normals[near].normalized(), randf() * 10.0])
+	_hits.append(hit)
+	if _hits.size() > MAX_HITS:
+		_hits.pop_front()
+	var pos := PackedVector4Array()
+	var cols := PackedVector4Array()
+	var nrms := PackedVector4Array()
+	pos.resize(MAX_HITS * (DROPS + 1))
+	cols.resize(pos.size())
+	nrms.resize(pos.size())
+	var n := 0
+	for h in _hits:
+		for st in h:
+			pos[n] = Vector4(st[0].x, st[0].y, st[0].z, st[1])
+			cols[n] = Vector4(st[2].r, st[2].g, st[2].b, st[3])
+			nrms[n] = Vector4(st[4].x, st[4].y, st[4].z, st[5])
+			n += 1
+	_material.set_shader_parameter("stain_pos", pos)
+	_material.set_shader_parameter("stain_col", cols)
+	_material.set_shader_parameter("stain_nrm", nrms)
+
+
+## Normale d'un sommet dans le monde, dans la pose actuelle (os principal seulement).
+func _posed_normal(i: int) -> Vector3:
+	var n := _stain_normals[i]
+	var basis := _skin_mesh.global_transform.basis
+	if _skeleton != null and _skin_mesh.skin != null and i < _stain_bones.size():
+		var bind := _stain_bones[i]
+		var skin := _skin_mesh.skin
+		if bind < skin.get_bind_count():
+			var bone := skin.get_bind_bone(bind)
+			var bind_name := skin.get_bind_name(bind)
+			if bind_name != &"":
+				bone = _skeleton.find_bone(bind_name)
+			if bone >= 0:
+				var pose := _skeleton.get_bone_global_pose(bone) * skin.get_bind_pose(bind)
+				basis = _skeleton.global_transform.basis * pose.basis
+	return (basis * n).normalized()
+
+
+func _closest_point(spot: Vector3) -> int:
+	var best := 0
+	var best_d := INF
+	# Un sommet sur quatre suffit pour une goutte.
+	for i in range(0, _stain_points.size(), 4):
+		var d := _stain_points[i].distance_squared_to(spot)
+		if d < best_d:
+			best_d = d
+			best = i
+	return best
 
 
 func head_position() -> Vector3:

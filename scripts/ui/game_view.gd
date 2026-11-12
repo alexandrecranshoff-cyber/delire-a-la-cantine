@@ -1196,7 +1196,7 @@ func _play_shot(e: Dictionary) -> void:
 		return
 	var vp: PawnView = pawns[victim.id]
 	vp.hit_flash()
-	vp.add_stain(GameAssets.texture("effets", str(info[1]) + ".png"), info[2])
+	vp.add_stain(GameAssets.texture("effets", str(info[1]) + ".png"), info[2], from, str(info[1]))
 	var dmg: Dictionary = r["damage_roll"]
 	var prefix := "Dégâts" if r["hit"] else "Retombée sur %s" % _who(victim)
 	if dmg["faces"].is_empty():

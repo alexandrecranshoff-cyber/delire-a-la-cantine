@@ -1,0 +1,14 @@
+{
+  "_note": "Habits à la couleur de la bande (tools/masques_habits.py). bas/haut : tranche du corps repeinte, en fraction de la taille (0 = pieds). garder : couleurs laissées telles quelles [teinte en degrés, écart, saturation minimale]. ref : luminosité médiane de l'habit d'origine (calculée par l'outil), ramenée à la couleur de la bande.",
+  "personnages": {
+    "bigleux":          {"bas": 0.4, "haut": 0.74, "garder": [], "ref": 0.63},
+    "grobill":          {"bas": 0.42, "haut": 0.78, "garder": [], "ref": 0.352},
+    "zieugloque":       {"bas": 0.4, "haut": 0.74, "garder": [[12, 14, 0.45]], "ref": 0.263},
+    "ledur":            {"bas": 0.3, "haut": 0.78, "garder": [], "ref": 0.278},
+    "dudugenoux":       {"bas": 0.42, "haut": 0.76, "garder": [], "ref": 0.878},
+    "delamensa":        {"bas": 0.38, "haut": 0.74, "garder": [], "ref": 0.239},
+    "neutre_lambda":    {"bas": 0.42, "haut": 0.76, "garder": [], "ref": 0.551},
+    "neutre_timide":    {"bas": 0.42, "haut": 0.76, "garder": [], "ref": 0.526},
+    "neutre_casquette": {"bas": 0.42, "haut": 0.76, "garder": [], "ref": 0.421}
+  }
+}
