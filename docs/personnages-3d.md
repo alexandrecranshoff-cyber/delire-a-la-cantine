@@ -54,3 +54,23 @@ aux onze personnages, quelles que soient leur taille et leur corpulence.
 
 Vue : 2. Modèle Tripo : 9 à 12. Squelette : 5, ou 8 avec une animation. Soit environ 25 crédits par
 personnage, et 32 pour les quatre clips de référence.
+
+## Habits de bande et taches
+
+Les élèves (et les neutres ralliés) n'ont plus de socle : le haut de leurs habits prend la couleur
+de leur bande. `python3 tools/masques_habits.py --apercu dossier` repasse chaque triangle du modèle
+dans l'espace de la texture pour savoir à quelle hauteur du corps est chaque pixel, et garde ceux
+de la tranche choisie dans `data/habits.json` (`bas`, `haut`) qui ne sont pas de la couleur de la
+peau (relevée sur le visage) ni d'une couleur à garder (`garder`, par exemple des cheveux). Il écrit
+`assets/hd|sd/personnages/<image>_habits.png` et la luminosité de référence `ref`. Le shader
+`personnage.gdshader` garde les plis et les rayures et prend la teinte de la bande. Le prof et le
+cuisinier n'ont pas de masque. Après un nouveau modèle, relancer l'outil puis l'import Godot.
+
+Les taches ne sont plus des images posées devant le personnage : elles sont peintes par le shader
+sur le vêtement. Au chargement, `GameAssets.stain_mesh` recopie le maillage en ajoutant à chaque
+sommet sa position et sa normale au repos (CUSTOM0, CUSTOM1), si bien qu'une tache reste au même
+endroit du tissu pendant les animations. `PawnView.add_stain` choisit un point du torse tourné vers
+le lanceur dans la pose du moment, y pose une tache et trois gouttes ; on en garde cinq.
+
+Planche d'essai sans lancer de partie :
+`xvfb-run godot --path . --rendering-driver opengl3 -s tools/apercu_personnages.gd -- capture=planche.png [gros=Ledur] [taches=3] [qualite=sd]`.

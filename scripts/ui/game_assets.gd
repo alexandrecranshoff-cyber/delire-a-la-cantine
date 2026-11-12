@@ -161,6 +161,78 @@ static func animations_for(image: String, skeleton: Skeleton3D, skin: Skin, skel
 	return library
 
 
+## Maillage d'un personnage prêt à recevoir des taches : copie du maillage importé où chaque
+## sommet garde sa position (CUSTOM0) et sa normale (CUSTOM1) au repos. Le shader y peint les
+## taches, qui suivent ainsi le vêtement quand le squelette bouge. Partagé par tous les pions qui
+## portent ce modèle ; « points » et « normales » servent à choisir où tombe une tache.
+static func stain_mesh(image: String, source: Mesh) -> Dictionary:
+	var key := "taches:" + image + ":" + str(source.get_instance_id())
+	if _cache.has(key):
+		return _cache[key]
+	var mesh := ArrayMesh.new()
+	var points := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var bones := PackedInt32Array()     # os principal de chaque sommet (indice dans la peau)
+	var custom_format := (Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT) | (Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM1_SHIFT)
+	for s in source.get_surface_count():
+		var arrays := source.surface_get_arrays(s)
+		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var norms: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+		var c0 := PackedFloat32Array()
+		var c1 := PackedFloat32Array()
+		c0.resize(verts.size() * 4)
+		c1.resize(verts.size() * 4)
+		for i in verts.size():
+			var v := verts[i]
+			var n := norms[i] if i < norms.size() else Vector3.UP
+			c0[i * 4] = v.x
+			c0[i * 4 + 1] = v.y
+			c0[i * 4 + 2] = v.z
+			c1[i * 4] = n.x
+			c1[i * 4 + 1] = n.y
+			c1[i * 4 + 2] = n.z
+		arrays[Mesh.ARRAY_CUSTOM0] = c0
+		arrays[Mesh.ARRAY_CUSTOM1] = c1
+		var flags := custom_format
+		if source is ArrayMesh and (source.surface_get_format(s) & Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS):
+			flags |= Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, flags)
+		mesh.surface_set_material(s, source.surface_get_material(s))
+		points.append_array(verts)
+		normals.append_array(norms)
+		var b_idx = arrays[Mesh.ARRAY_BONES]
+		var b_w = arrays[Mesh.ARRAY_WEIGHTS]
+		var per := 4
+		if b_idx != null and verts.size() > 0:
+			per = b_idx.size() / verts.size()
+		for i in verts.size():
+			var main := 0
+			if b_idx != null and b_w != null and b_idx.size() >= (i + 1) * per:
+				var w := -1.0
+				for k in per:
+					if b_w[i * per + k] > w:
+						w = b_w[i * per + k]
+						main = b_idx[i * per + k]
+			bones.append(main)
+	var entry := {"mesh": mesh, "points": points, "normales": normals, "os": bones}
+	_cache[key] = entry
+	return entry
+
+
+## Habits à la couleur de la bande : {"masque": Texture2D, "ref": float}, vide si le personnage
+## n'en a pas (prof, cuisinier). Voir tools/masques_habits.py et data/habits.json.
+static func clothes(image: String) -> Dictionary:
+	var key := "habits:" + image
+	if not _cache.has(key):
+		var settings: Dictionary = _json("res://data/habits.json")["personnages"]
+		var mask := texture("personnages", image + "_habits.png")
+		if mask == null or not settings.has(image):
+			_cache[key] = {}
+		else:
+			_cache[key] = {"masque": mask, "ref": float(settings[image].get("ref", 0.4))}
+	return _cache[key]
+
+
 static func _json(p: String) -> Dictionary:
 	return JSON.parse_string(FileAccess.get_file_as_string(p))
 
