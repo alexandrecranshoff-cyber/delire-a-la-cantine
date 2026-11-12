@@ -45,6 +45,8 @@ var _rotating := false
 var _rotate_tween: Tween
 var _cam_goal := 45.0
 var _hovered: PawnView
+var _cursor := Cursors.Kind.DEFAULT       # curseur affiché sur la salle
+var _want_cursor := Cursors.Kind.DEFAULT  # curseur voulu par le dernier survol
 var _shake := 0.0
 var _stats := {}
 var hud_auto := false
@@ -141,7 +143,9 @@ func _ready() -> void:
 	hud.auto_pass = hud_auto
 	add_child(hud)
 	hud.end_turn_pressed.connect(_end_turn)
-	hud.watering_toggled.connect(func(on): watering = on)
+	hud.watering_toggled.connect(func(on):
+		watering = on
+		_refresh_cursor())
 	hud.rotate_pressed.connect(func(direction): rotate_camera(direction * ROTATE_STEP))
 	hud.project_pressed.connect(_project)
 	hud.unit_picked.connect(func(id): _pick(state.get_unit(id)))
@@ -167,6 +171,7 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	Engine.time_scale = 1.0
+	Cursors.uninstall()
 
 
 func _intro() -> void:
@@ -432,6 +437,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				if _can_act():
 					watering = not watering
 					hud.set_watering(watering)
+					_refresh_cursor()
 			KEY_P: _project()
 			KEY_TAB: _select_next()
 			KEY_V:
@@ -491,6 +497,27 @@ func _process(delta: float) -> void:
 	elif _shake > 0.0:
 		_shake = maxf(0.0, _shake - real_delta * 0.6)
 		_update_camera()
+	# Pendant les animations et le tour des autres, plus de viseur : on ne peut pas tirer.
+	if _cursor != Cursors.Kind.DEFAULT and not _can_act():
+		_set_cursor(Cursors.Kind.DEFAULT)
+
+
+## Recalcule le viseur sous la souris (bascule tir / arrosage sans bouger la souris).
+func _refresh_cursor() -> void:
+	if not _can_act():
+		return
+	var c = _mouse_cell(get_viewport().get_mouse_position())
+	if c != null:
+		_hover(c)
+
+
+func _set_cursor(kind: Cursors.Kind) -> void:
+	if kind == _cursor:
+		return
+	if kind != Cursors.Kind.DEFAULT:
+		Cursors.install()
+	_cursor = kind
+	Cursors.apply(kind)
 
 
 func _mouse_cell(screen: Vector2):
@@ -575,6 +602,8 @@ func _select(u: Unit) -> void:
 	push_cart = null
 	if u != null:
 		pawns[u.id].set_selected(true)
+	else:
+		_set_cursor(Cursors.Kind.DEFAULT)
 	_refresh_all()
 
 
@@ -625,7 +654,14 @@ func _hover_text(u: Unit) -> String:
 	return "%s  %d" % [u.name if u.kind == Unit.Kind.STUDENT else _who(u), u.moral]
 
 
+## Survol d'une case : surbrillances, bulle d'aide, et viseur quand une cible est sous la souris.
 func _hover(c: Vector2i) -> void:
+	_want_cursor = Cursors.Kind.DEFAULT
+	_hover_cell(c)
+	_set_cursor(_want_cursor)
+
+
+func _hover_cell(c: Vector2i) -> void:
 	var target := _visible_unit_at(c)
 	if target != null and target.kind != Unit.Kind.CART:
 		_set_hovered(pawns[target.id], _hover_text(target))
@@ -649,6 +685,10 @@ func _hover(c: Vector2i) -> void:
 		var reason := Combat.cannot_shoot_reason(state, selected, target, watering)
 		var traj := Trajectory.cells(selected.pos, target.pos)
 		var color := Color(1, 0.3, 0.2, 0.85) if reason == "" else Color(0.5, 0.5, 0.5, 0.6)
+		if reason == "":
+			_want_cursor = Cursors.Kind.WATER if watering else Cursors.Kind.AIM
+		else:
+			_want_cursor = Cursors.Kind.BLOCKED
 		_show_cells(traj.map(func(p): return [p, color]))
 		var dist := Board.distance(selected.pos, target.pos)
 		if reason == "":
