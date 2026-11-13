@@ -71,7 +71,6 @@ jobs:
           mkdir -p site/telecharger
           (cd pc && chmod +x delire_a_la_cantine.x86_64 && zip -q -9 ../site/telecharger/delire_a_la_cantine_pc_windows.zip delire_a_la_cantine.exe && zip -q -9 ../site/telecharger/delire_a_la_cantine_pc_linux.zip delire_a_la_cantine.x86_64)
           cp deploiement/htaccess-racine site/.htaccess
-          printf 'User-agent: *\nDisallow: /\n' > site/robots.txt
           rm -f site/.gdignore
           # Le site va dans le dossier parent de celui du jeu (FTP_DOSSIER sans « cantine/ »)
           racine="${FTP_DOSSIER%cantine/}"
