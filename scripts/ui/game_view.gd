@@ -448,6 +448,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_ESCAPE:
 				if hud.help_open():
 					hud.toggle_help()
+				elif push_cart != null:
+					push_cart = null  # Échap pendant une poussée : on garde l'élève, on lâche le chariot
+					_refresh_all()
+					hud.set_hint("Poussée annulée.")
 				else:
 					_select(null)
 
@@ -522,7 +526,9 @@ func _set_cursor(kind: Cursors.Kind) -> void:
 
 func _mouse_cell(screen: Vector2):
 	# Un personnage sous le curseur passe avant le décor : on vise son corps, pas ses pieds.
-	var pawn_cell = _pawn_under(screen)
+	# Sauf pendant une poussée de chariot : on choisit une case de sol, et le chariot ou le pousseur
+	# ne doivent pas cacher les cases juste derrière eux.
+	var pawn_cell = _pawn_under(screen) if push_cart == null else null
 	if pawn_cell != null:
 		return pawn_cell
 	var origin := camera.project_ray_origin(screen)
@@ -672,10 +678,7 @@ func _hover_cell(c: Vector2i) -> void:
 		hud.set_hint("Clique sur un de tes élèves" if target == null or not _is_mine(target) else "Clic : choisir %s" % target.name)
 		return
 	if push_cart != null:
-		var path := Movement.path_to(state, push_cart, c)
-		var ok := not path.is_empty() and path.size() <= int(state.data.rules["chariot_cases_max"])
-		_show_cells(path.map(func(p): return [p, Color(1, 0.8, 0.2, 0.8) if ok else Color(1, 0.2, 0.2, 0.7)]))
-		hud.set_hint("Pousser le chariot ici (%d PA, pas de tir ce tour)" % state.data.ap_cost("pousser_chariot") if ok else "Trop loin pour le chariot (3 cases max)")
+		_hover_push(c)
 		return
 	if target != null and _is_mine(target) and target != selected:
 		_show_cells([[c, Color(1, 1, 1, 0.7)]])
@@ -697,10 +700,18 @@ func _hover_cell(c: Vector2i) -> void:
 			hud.set_hint("%s %s : distance %d, %s (%d PA). Chances : %s" % [what, _who(target), dist, need, state.data.ap_cost("arrosage" if watering else "tir"), _chance_word(selected, dist)])
 		else:
 			hud.set_hint(_reason_text(reason))
+		if _projection_targets().has(target):
+			var who := target.name if target.kind == Unit.Kind.STUDENT else _who(target).capitalize()
+			hud.set_hint("%s : vous êtes assez nombreux autour. P ou PROJETER pour le jeter dans le plat du jour !" % who)
 		return
-	if target != null and target.kind == Unit.Kind.CART and Board.adjacent(selected.pos, target.pos):
-		hud.set_hint("Clic : pousser ce chariot (3 cases max)")
-		_show_cells([[c, Color(1, 0.8, 0.2, 0.8)]])
+	if target != null and target.kind == Unit.Kind.CART:
+		var why := _cannot_push_reason(target)
+		if why == "":
+			hud.set_hint("Clic : pousser ce chariot (%d cases max, %d PA, pas de tir ensuite)" % [_cart_max(), state.data.ap_cost("pousser_chariot")])
+			_show_cells([[c, Color(1, 0.8, 0.2, 0.8)]])
+		else:
+			hud.set_hint(why)
+			_show_cells([[c, Color(0.5, 0.5, 0.5, 0.6)]])
 		return
 	if Movement.can_climb(state, selected, c):
 		_show_cells([[c, Color(0.7, 0.4, 1, 0.85)]])
@@ -743,8 +754,19 @@ func _click(c: Vector2i) -> void:
 		return
 	if selected == null:
 		return
+	hud.clear_note()
 	var events := []
 	if push_cart != null:
+		if c == push_cart.pos:
+			# Nouveau clic sur le chariot : on renonce à le pousser.
+			push_cart = null
+			_refresh_all()
+			hud.set_hint("Poussée annulée.")
+			return
+		if not _cart_targets().has(c):
+			# Case impossible : on reste en mode poussée et on explique.
+			hud.show_note("Le chariot ne peut pas aller là : case libre à %d cases au plus (cases jaunes). Clic sur le chariot ou Échap pour annuler." % _cart_max(), 4.0)
+			return
 		events = GameActions.push_cart(state, selected, push_cart, c)
 		push_cart = null
 		if not events.is_empty():
@@ -752,9 +774,14 @@ func _click(c: Vector2i) -> void:
 		if events.is_empty():
 			_refresh_all()
 			return
-	elif target != null and target.kind == Unit.Kind.CART and Board.adjacent(selected.pos, target.pos):
+	elif target != null and target.kind == Unit.Kind.CART:
+		var why := _cannot_push_reason(target)
+		if why != "":
+			hud.show_note(why, 4.0)
+			return
 		push_cart = target
-		hud.set_hint("Choisis où pousser le chariot (3 cases max)")
+		_show_cells(_cart_targets().map(func(p): return [p, Color(1, 0.8, 0.2, 0.55)]))
+		hud.show_note("Choisis une case jaune où pousser le chariot (%d cases max). Clic sur le chariot ou Échap pour annuler." % _cart_max(), 3.0)
 		return
 	elif target != null and target != selected:
 		var reason := Combat.cannot_shoot_reason(state, selected, target, watering)
@@ -793,16 +820,108 @@ func _run(events: Array) -> void:
 		_end_turn()
 
 
+# --- Chariots -------------------------------------------------------------------
+
+func _cart_max() -> int:
+	return int(state.data.rules["chariot_cases_max"])
+
+
+## Pourquoi l'élève choisi ne peut pas pousser ce chariot ("" s'il le peut).
+func _cannot_push_reason(cart: Unit) -> String:
+	var cost := state.data.ap_cost("pousser_chariot")
+	if not Board.adjacent(selected.pos, cart.pos):
+		return "Chariot : va au contact (case voisine) pour le pousser de %d cases. %d PA, pas de tir ensuite." % [_cart_max(), cost]
+	if selected.on_table:
+		return "Descends de la table pour pousser le chariot."
+	if selected.has_shot:
+		return _pushed_this_turn.get(selected.id, "%s a déjà tiré ce tour : on ne pousse pas un chariot après un tir." % selected.name)
+	if selected.ap < cost:
+		return "Pousser un chariot coûte %d PA : il n'en reste que %d à %s." % [cost, selected.ap, selected.name]
+	if _cart_targets(cart).is_empty():
+		return "Ce chariot est coincé : aucune case libre autour."
+	return ""
+
+
+## Cases où le chariot (par défaut celui en cours de poussée) peut aller.
+func _cart_targets(cart: Unit = null) -> Array:
+	if cart == null:
+		cart = push_cart
+	var out := []
+	for k in Movement.reachable(state, cart, _cart_max()).keys():
+		if k != cart.pos:
+			out.append(k)
+	return out
+
+
+func _hover_push(c: Vector2i) -> void:
+	var targets := _cart_targets()
+	var cells := targets.map(func(p): return [p, Color(1, 0.8, 0.2, 0.45)])
+	if c == push_cart.pos:
+		cells.append([c, Color(1, 0.3, 0.2, 0.7)])
+		hud.set_hint("Clic sur le chariot : annuler la poussée")
+	elif targets.has(c):
+		for p in Movement.path_to(state, push_cart, c):
+			cells.append([p, Color(1, 0.65, 0.0, 0.95)])
+		hud.set_hint("Pousser le chariot ici (%d PA, pas de tir ce tour)" % state.data.ap_cost("pousser_chariot"))
+	else:
+		hud.set_hint("Choisis une case jaune (%d cases max). Clic sur le chariot ou Échap : annuler." % _cart_max())
+	_show_cells(cells)
+
+
+# --- Projection ------------------------------------------------------------------
+
 ## Victimes que la bande active peut projeter dans un bac ou un chariot.
 func _projection_targets() -> Array:
 	var out := []
-	for v in state.units:
-		if not v.is_on_board() or v.kind == Unit.Kind.CART or v.team == state.current_team or v.status == Unit.Status.CAPTURED:
-			continue
+	for v in _projection_candidates():
 		var team := GameActions.projection_team(state, state.current_team, v)
 		if not team.is_empty() and SpecialActions.cannot_project_reason(state, team, v) == "":
 			out.append(v)
 	return out
+
+
+## Ennemis visibles qu'on pourrait un jour projeter (pas les siens, pas les chariots, pas les élèves pris).
+func _projection_candidates() -> Array:
+	var out := []
+	for v in state.units:
+		if not v.is_on_board() or v.kind == Unit.Kind.CART or v.team == state.current_team or v.status == Unit.Status.CAPTURED:
+			continue
+		if pawns.has(v.id) and not pawns[v.id].shown:
+			continue
+		out.append(v)
+	return out
+
+
+## Règle de la projection, avec les chiffres de data/regles_video.json.
+func _projection_rule_text() -> String:
+	var req: Dictionary = state.data.rules["projection_eleves_requis"]
+	return "Projeter : %d élèves de ta bande au contact d'un élève ennemi (%d pour un prof, %d pour le cuisinier), la victime à %d cases au plus d'un bac ou d'un chariot. %d PA chacun, puis 1D6 : de 1 à %d, dans le plat du jour !" % [
+		int(req["eleve"]), int(req["prof"]), int(req["cuisinier"]), int(state.data.rules["distance_max_bac"]),
+		state.data.ap_cost("projection"), state.data.roll_threshold("projection_max")]
+
+
+## Explique ce qui manque pour la projection la plus proche d'être possible.
+func _projection_help() -> String:
+	var max_dist := int(state.data.rules["distance_max_bac"])
+	var cost := state.data.ap_cost("projection")
+	var best: Unit = null
+	var best_missing := 1 << 20
+	var best_have := 0
+	for v in _projection_candidates():
+		if state.distance_to_nearest_container(v.pos) > max_dist:
+			continue
+		var have := GameActions.projection_team(state, state.current_team, v).size()
+		var missing := SpecialActions.required_attackers(state, v) - have
+		if missing < best_missing:
+			best = v
+			best_missing = missing
+			best_have = have
+	if best != null and best_have == 0:
+		return "Personne à projeter : aucun de tes élèves n'est au contact d'un ennemi proche d'un bac ou d'un chariot. Il faut s'y mettre à %d autour de lui (plus pour un adulte)." % int(state.data.rules["projection_eleves_requis"]["eleve"])
+	if best == null:
+		return "Personne à projeter : aucun ennemi en vue n'est à %d cases d'un bac ou d'un chariot. Astuce : pousse un chariot à côté de lui, puis entoure-le à plusieurs." % max_dist
+	return "Pour projeter %s (près d'un bac ou d'un chariot) : %d de tes élèves au contact avec %d PA, il en faut %d. Il en manque %d." % [
+		_who(best) if best.kind != Unit.Kind.STUDENT else best.name, best_have, cost, SpecialActions.required_attackers(state, best), best_missing]
 
 
 func _project() -> void:
@@ -810,8 +929,10 @@ func _project() -> void:
 		return
 	var targets := _projection_targets()
 	if targets.is_empty():
-		hud.set_hint("Projeter : il faut être 3 au contact d'un élève (5 pour un prof, 7 pour le cuisinier), près d'un bac ou d'un chariot.")
+		hud.show_note(_projection_help(), 8.0)
+		hud.log_line(_projection_rule_text())
 		return
+	hud.clear_note()
 	var victim: Unit = targets[0]
 	if selected != null:
 		for v in targets:

@@ -33,6 +33,9 @@ var _log: RichTextLabel
 var _hint: Label
 var _water_button: Button
 var _project_button: Button
+var _project_ready_box: StyleBox   # bouton PROJETER quand une projection est possible
+var _project_idle_box: StyleBox    # grisé mais cliquable : un clic explique ce qu'il manque
+var _sticky_until := 0             # bulle d'aide maintenue jusqu'à cet instant (ms)
 var _end_button: Button
 var _speed_button: Button
 var _music_button: Button
@@ -270,7 +273,9 @@ func _build_bottom() -> void:
 	_water_button.toggled.connect(func(on): watering_toggled.emit(on))
 	buttons.add_child(_water_button)
 	_project_button = BD.sticker("PROJETER", Color("c2571a"), 20)
-	_project_button.tooltip_text = "À trois autour d'un ennemi, près d'un bac ou d'un chariot : dans le plat du jour ! (P)"
+	_project_button.tooltip_text = "Tous ensemble au contact d'un ennemi près d'un bac ou d'un chariot : dans le plat du jour ! Clic pour savoir ce qu'il manque (P)"
+	_project_ready_box = _project_button.get_theme_stylebox("normal")
+	_project_idle_box = _project_button.get_theme_stylebox("disabled")
 	_project_button.pressed.connect(func(): project_pressed.emit())
 	buttons.add_child(_project_button)
 	for spec in [["gauche", -1, "Tourner la vue à gauche (Q)"], ["droite", 1, "Tourner la vue à droite (E)"]]:
@@ -346,7 +351,8 @@ func _build_help() -> void:
 		"Les profs entrent par une porte tirée au dé. À la fin de chaque tour complet, ils avancent de 4 cases vers l'élève le plus proche et l'attrapent au contact : tiens-toi à plus de 5 cases, ou sature-les (30 de moral).",
 		"Le cuisinier défend sa cuisine, lui aussi en fin de tour : il tire et plonge les imprudents dans le plat du jour.",
 		"Neutre touché : sur 1 il te rejoint, sur 6 il devient berserk, sinon il s'enfuit.",
-		"Clic sur une table au contact pour grimper dessus (tout le tour). Clic sur un chariot au contact pour le pousser de 3 cases.",
+		"Clic sur une table au contact pour grimper dessus (tout le tour). Chariot : clic dessus depuis une case voisine, puis clic sur une case jaune (%d cases max, %d PA, pas de tir ensuite)." % [int(rules["chariot_cases_max"]), int(ap["pousser_chariot"])],
+		"Projeter : %d de ta bande au contact d'un ennemi qui est à %d cases au plus d'un bac ou d'un chariot, puis P ou PROJETER (%d PA chacun, 1 à %d sur 1D6). Pousse un chariot près de lui pour y arriver !" % [int(rules["projection_eleves_requis"]["eleve"]), int(rules["distance_max_bac"]), int(ap["projection"]), int(rules["jets"]["projection_max"])],
 		"Caméra : clic droit pour tourner (glisser en haut ou en bas pour l'incliner, ou Page préc. et Page suiv.), Q et E par crans, molette pour zoomer, flèches ou clic molette pour se déplacer.",
 		"Entrée : fin du tour.  R : arroser au robinet.  P : projeter.  V : vitesse.  M : musique.  F5 : sauvegarder.  Espace : accélérer le tour des autres.  Échap : désélectionner.",
 	]
@@ -521,8 +527,21 @@ func set_roster(units: Array, selected: Unit) -> void:
 
 
 func set_hint(text: String) -> void:
+	if Time.get_ticks_msec() < _sticky_until:
+		return  # une explication demandée par le joueur reste lisible quelques secondes
 	_hint.text = text
 	_hint.visible = text != ""
+
+
+## Bulle d'aide qui reste affichée malgré les survols (réponse à un clic du joueur).
+func show_note(text: String, seconds: float = 6.0) -> void:
+	_sticky_until = 0
+	set_hint(text)
+	_sticky_until = Time.get_ticks_msec() + int(seconds * 1000.0)
+
+
+func clear_note() -> void:
+	_sticky_until = 0
 
 
 func set_watering(on: bool) -> void:
@@ -531,7 +550,10 @@ func set_watering(on: bool) -> void:
 
 func set_actions(can_water: bool, can_project: bool, human_turn: bool) -> void:
 	_water_button.disabled = not can_water
-	_project_button.disabled = not can_project
+	# PROJETER reste cliquable pendant son tour : s'il n'y a personne à projeter, un clic explique pourquoi.
+	_project_button.disabled = not human_turn
+	_project_button.text = "PROJETER !" if can_project else "PROJETER"
+	_project_button.add_theme_stylebox_override("normal", _project_ready_box if can_project else _project_idle_box)
 	_end_button.disabled = not human_turn
 
 
