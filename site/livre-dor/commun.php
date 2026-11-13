@@ -23,7 +23,48 @@ function chemin_donnees(): string
     return __DIR__ . '/donnees/messages.json';
 }
 
-// Ouvre le fichier sous verrou, passe la liste à $modifier, réécrit ce qu'elle renvoie.
+// Lit et modifie un fichier JSON quelconque de donnees/, sous verrou exclusif.
+function avec_fichier(string $chemin, callable $modifier)
+{
+    $f = fopen($chemin, 'c+');
+    if ($f === false) {
+        throw new RuntimeException('fichier de données inaccessible');
+    }
+    flock($f, LOCK_EX);
+    $contenu = stream_get_contents($f);
+    $donnees = $contenu ? json_decode($contenu, true) : null;
+    if (!is_array($donnees)) {
+        $donnees = [];
+    }
+    $resultat = $modifier($donnees);
+    ftruncate($f, 0);
+    rewind($f);
+    fwrite($f, json_encode($donnees, JSON_UNESCAPED_UNICODE));
+    fflush($f);
+    flock($f, LOCK_UN);
+    fclose($f);
+    return $resultat;
+}
+
+function lire_json(string $chemin): array
+{
+    $contenu = is_file($chemin) ? file_get_contents($chemin) : '';
+    $donnees = $contenu ? json_decode($contenu, true) : null;
+    return is_array($donnees) ? $donnees : [];
+}
+
+// Sel tiré au hasard à la première visite et gardé sur le serveur : les empreintes de visiteurs
+// ne peuvent pas être recalculées à partir d'une adresse IP sans lui.
+function sel_secret(): string
+{
+    $chemin = __DIR__ . '/donnees/sel.txt';
+    if (!is_file($chemin)) {
+        file_put_contents($chemin, bin2hex(random_bytes(32)), LOCK_EX);
+    }
+    return (string) file_get_contents($chemin);
+}
+
+// Ouvre le fichier des messages sous verrou, passe la liste à $modifier, réécrit ce qu'elle renvoie.
 function avec_messages(callable $modifier, bool $ecriture)
 {
     $f = fopen(chemin_donnees(), 'c+');
