@@ -44,7 +44,7 @@ h1, h2, h3 { font-family: var(--titre); font-weight: 700; line-height: 1.02; mar
 .couverture { border-bottom: 3px double var(--encre); padding: 22px 0 46px; position: relative; }
 .surtitre { display: flex; justify-content: space-between; gap: 16px; font-size: .95rem; letter-spacing: .14em; text-transform: uppercase; color: var(--gris); border-bottom: var(--filet); padding-bottom: 10px; }
 .titre-revue {
-  font-size: clamp(3.2rem, 11vw, 8.6rem); letter-spacing: -.02em; margin: 26px 0 0;
+  font-size: clamp(3.2rem, 8vw, 6.6rem); letter-spacing: -.02em; margin: 26px 0 0;
   display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .18em;
 }
 .titre-revue .et { color: var(--rouge); font-style: italic; font-weight: 600; }
@@ -53,6 +53,14 @@ h1, h2, h3 { font-family: var(--titre); font-weight: 700; line-height: 1.02; mar
   font-family: var(--texte); font-size: clamp(1.05rem, 2.4vw, 1.4rem); letter-spacing: .08em; text-transform: uppercase;
   padding: 6px 16px 5px; transform: rotate(-1deg);
 }
+.une { display: grid; grid-template-columns: 1fr auto; gap: 30px; align-items: end; }
+.une > div { min-width: 0; }
+.couvertures { display: flex; padding: 0 14px 8px 0; }
+.couvertures .miniature { width: 150px; }
+.couvertures .miniature img { width: 150px; height: auto; aspect-ratio: 400 / 522; box-shadow: 6px 6px 0 rgba(22,19,15,.85); }
+.couvertures .miniature:first-child { transform: rotate(-5deg); position: relative; z-index: 1; }
+.couvertures .miniature:last-child { transform: rotate(4deg) translate(-24px, 14px); }
+.couvertures .miniature span { text-align: center; }
 .chapeau { font-size: clamp(1.3rem, 2.6vw, 1.65rem); line-height: 1.4; max-width: 760px; margin: 26px 0 0; text-wrap: pretty; }
 
 /* ---------- La revue ---------- */
@@ -79,19 +87,19 @@ h1, h2, h3 { font-family: var(--titre); font-weight: 700; line-height: 1.02; mar
   border: 2px solid var(--encre); box-shadow: 8px 8px 0 rgba(22,19,15,.85); margin-bottom: 48px; overflow: hidden;
 }
 .encart .visuel { position: relative; min-height: 300px; background: #222; }
-.encart .visuel > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.encart .visuel > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 22% center; }
 .encart .corps { padding: 28px 30px 30px; display: flex; flex-direction: column; }
 .encart .numero { font-size: .9rem; letter-spacing: .14em; text-transform: uppercase; color: var(--rouge); margin-bottom: 6px; }
 .encart h3 { font-size: clamp(2.3rem, 5vw, 3.2rem); margin-bottom: 10px; }
 .encart p { margin: 0 0 14px; }
 .encart .genre { font-style: italic; color: var(--gris); margin-top: -6px; }
-.miniatures { display: flex; gap: 14px; margin: 6px 0 22px; flex-wrap: wrap; }
-.miniature { border: 0; padding: 0; background: none; cursor: zoom-in; text-align: left; font: inherit; color: inherit; width: 150px; }
-.miniature img { width: 150px; height: 104px; object-fit: cover; border: 1px solid var(--encre); box-shadow: 3px 3px 0 rgba(22,19,15,.35); transition: transform .2s; }
+.miniatures { display: flex; gap: 10px; margin: 6px 0 22px; flex-wrap: wrap; }
+.miniature { border: 0; padding: 0; background: none; cursor: zoom-in; text-align: left; font: inherit; color: inherit; width: 130px; }
+.miniature img { width: 130px; height: 104px; object-fit: cover; border: 1px solid var(--encre); box-shadow: 3px 3px 0 rgba(22,19,15,.35); transition: transform .2s; }
 .miniature:hover img, .miniature:focus-visible img { transform: translate(-2px,-2px) rotate(-1.5deg); }
 .miniature span { display: block; font-size: .9rem; color: var(--gris); margin-top: 6px; line-height: 1.2; }
-.miniature.vide { cursor: default; }
-.miniature.vide .cadre { width: 150px; height: 104px; border: 1px dashed var(--gris); display: grid; place-items: center; color: var(--gris); font-size: .9rem; text-align: center; padding: 8px; }
+.miniature.haute { width: 78px; }
+.miniature.haute img { width: 78px; height: 104px; }
 .lien-jeu {
   margin-top: auto; align-self: flex-start; display: inline-flex; align-items: center; gap: 10px;
   background: var(--encre); color: var(--papier-clair); text-decoration: none; font-size: 1.15rem; letter-spacing: .06em; text-transform: uppercase;
@@ -126,6 +134,9 @@ dialog.visionneuse::backdrop { background: rgba(10,8,6,.92); }
 .visionneuse .fermer { position: fixed; top: 12px; right: 16px; background: none; border: 0; color: #fff; font-size: 2.4rem; line-height: 1; cursor: pointer; }
 
 @media (max-width: 860px) {
+  .une { grid-template-columns: 1fr; }
+  .couvertures { justify-content: center; }
+  .couvertures .miniature, .couvertures .miniature img { width: 120px; }
   .revue { grid-template-columns: 1fr; }
   .encart { grid-template-columns: 1fr; }
   .encart .visuel { min-height: 0; aspect-ratio: 16 / 9; }
@@ -137,8 +148,9 @@ dialog.visionneuse::backdrop { background: rgba(10,8,6,.92); }
   .wrap { padding-inline: 16px; }
   .surtitre span:last-child { display: none; }
   .encart .corps { padding: 22px 18px 24px; }
-  .miniature, .miniature img, .miniature.vide .cadre { width: 130px; }
-  .miniature img, .miniature.vide .cadre { height: 92px; }
+  .miniature, .miniature img { width: 120px; }
+  .miniature.haute, .miniature.haute img { width: 69px; }
+  .miniature img { height: 92px; }
   .encart { box-shadow: 5px 5px 0 rgba(22,19,15,.85); }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -149,9 +161,16 @@ dialog.visionneuse::backdrop { background: rgba(10,8,6,.92); }
 <header class="couverture">
   <div class="wrap">
     <div class="surtitre"><span>iomino.fr</span><span>Hommage · 1980-1990 · 2026</span></div>
+    <div class="une"><div>
     <h1 class="titre-revue"><span>Jeux</span><span class="et">&amp;</span><span>Stratégie</span></h1>
     <div class="bandeau-rouge">Les jeux en encart, rejoués en jeux vidéo</div>
     <p class="chapeau">Pendant dix ans, une revue a glissé un jeu de plateau complet entre ses pages. Nous en reprenons quelques-uns, pour les jouer à l'écran.</p>
+    </div>
+    <div class="couvertures">
+      <button class="miniature" type="button" data-grand="images/encarts/js14_couverture.webp" data-legende="Jeux &amp; Stratégie n° 14 (1982), avec Délire à la cantine en encart"><img src="images/encarts/js14_couverture_mini.webp" alt="Couverture du n° 14 de Jeux &amp; Stratégie" width="400" height="521"><span>N° 14</span></button>
+      <button class="miniature" type="button" data-grand="images/encarts/js16_couverture.webp" data-legende="Jeux &amp; Stratégie n° 16 (1982), avec Fric-Frac en encart"><img src="images/encarts/js16_couverture_mini.webp" alt="Couverture du n° 16 de Jeux &amp; Stratégie" width="400" height="523"><span>N° 16</span></button>
+    </div>
+    </div>
   </div>
 </header>
 
@@ -182,12 +201,15 @@ dialog.visionneuse::backdrop { background: rgba(10,8,6,.92); }
     <article class="encart cantine">
       <div class="visuel"><img src="images/titre.webp" alt="Délire à la cantine : le cuisinier et le surveillant fondent sur une cantine en pleine bataille de nourriture" width="1800" height="1005" loading="lazy"></div>
       <div class="corps">
-        <div class="numero">Encart · Didier Guiserix et François Marcela-Froideval</div>
+        <div class="numero">N° 14, 1982 · Didier Guiserix et François Marcela-Froideval</div>
         <h3>Délire à la cantine</h3>
         <p class="genre">Bataille de nourriture tactique</p>
         <p>Midi pile, la purée vole. Chaque bande de six élèves doit être la dernière debout, entre les tables, les bacs de la cuisine, le surveillant et son sifflet. À jouer dans le navigateur ou sur PC.</p>
         <div class="miniatures">
-          <div class="miniature vide"><div class="cadre">Encart d'origine bientôt</div></div>
+          <button class="miniature haute" type="button" data-grand="images/encarts/js14_couverture.webp" data-legende="Jeux &amp; Stratégie n° 14 (1982)"><img src="images/encarts/js14_couverture_mini.webp" alt="Couverture du n° 14" width="400" height="521" loading="lazy"><span>Le n° 14</span></button>
+          <button class="miniature" type="button" data-grand="images/encarts/cantine_plateau.webp" data-legende="Délire à la cantine, le plateau de l'encart : la salle et la cuisine (Jeux &amp; Stratégie n° 14, 1982)"><img src="images/encarts/cantine_plateau_mini.webp" alt="Le plateau d'origine de Délire à la cantine" width="640" height="474" loading="lazy"><span>Le plateau</span></button>
+          <button class="miniature haute" type="button" data-grand="images/encarts/cantine_regles_1.webp" data-legende="Délire à la cantine, première page de la règle (Jeux &amp; Stratégie n° 14, 1982)"><img src="images/encarts/cantine_regles_1_mini.webp" alt="Première page de la règle de Délire à la cantine" width="480" height="616" loading="lazy"><span>La règle</span></button>
+          <button class="miniature" type="button" data-grand="images/encarts/cantine_regles_2.webp" data-legende="Délire à la cantine, suite de la règle et tableaux (Jeux &amp; Stratégie n° 14, 1982)"><img src="images/encarts/cantine_regles_2_mini.webp" alt="Suite de la règle de Délire à la cantine" width="640" height="426" loading="lazy"><span>La suite</span></button>
         </div>
         <a class="lien-jeu" href="delire-a-la-cantine.html">Découvrir le jeu <span aria-hidden="true">→</span></a>
       </div>
@@ -196,15 +218,16 @@ dialog.visionneuse::backdrop { background: rgba(10,8,6,.92); }
     <article class="encart fricfrac">
       <div class="visuel"><img src="images/fric-frac/titre.webp" alt="Fric-Frac : la villa de Neuilly, de nuit, derrière sa grille" width="1800" height="1005" loading="lazy"></div>
       <div class="corps">
-        <div class="numero">Encart de 1982 · François Nédélec, plateau de Claude Lacroix</div>
+        <div class="numero">N° 16, 1982 · François Nédélec, plateau de Claude Lacroix</div>
         <h3>Fric-Frac <span class="statut">en préparation</span></h3>
         <p class="genre">Cambriolage tactique</p>
         <p>Une villa de Neuilly, deux gardes et une rivière de diamants offerte à Madame. Les voleurs forcent portes, fenêtres et secrétaires, et chaque geste fait du bruit. Sur PC, Windows et Linux.</p>
         <div class="miniatures">
-          <button class="miniature" type="button" data-grand="images/encarts/fric_frac_plateau.webp" data-legende="Fric-Frac, le plateau de l'encart : la villa et son jardin, en cases hexagonales (Jeux &amp; Stratégie, 1982)">
+          <button class="miniature haute" type="button" data-grand="images/encarts/js16_couverture.webp" data-legende="Jeux &amp; Stratégie n° 16 (1982)"><img src="images/encarts/js16_couverture_mini.webp" alt="Couverture du n° 16" width="400" height="523" loading="lazy"><span>Le n° 16</span></button>
+          <button class="miniature" type="button" data-grand="images/encarts/fric_frac_plateau.webp" data-legende="Fric-Frac, le plateau de l'encart : la villa et son jardin, en cases hexagonales (Jeux &amp; Stratégie n° 16, 1982)">
             <img src="images/encarts/fric_frac_plateau_mini.webp" alt="Le plateau d'origine de Fric-Frac" width="640" height="474" loading="lazy"><span>Le plateau</span>
           </button>
-          <button class="miniature" type="button" data-grand="images/encarts/fric_frac_regles.webp" data-legende="Fric-Frac, la règle du jeu et ses trois tableaux (Jeux &amp; Stratégie, 1982)">
+          <button class="miniature" type="button" data-grand="images/encarts/fric_frac_regles.webp" data-legende="Fric-Frac, la règle du jeu et ses trois tableaux (Jeux &amp; Stratégie n° 16, 1982)">
             <img src="images/encarts/fric_frac_regles_mini.webp" alt="Les pages de règles de Fric-Frac" width="640" height="432" loading="lazy"><span>La règle</span>
           </button>
         </div>
