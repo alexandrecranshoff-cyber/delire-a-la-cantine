@@ -13,9 +13,6 @@ AddType text/javascript .js
 # Le navigateur revérifie les fichiers à chaque visite : une mise à jour du jeu est vue tout de suite
 <IfModule mod_headers.c>
   Header set Cache-Control "no-cache"
-  # Site non référencé : les moteurs de recherche n'indexent pas le jeu.
-  # Supprimer la ligne suivante le jour où le jeu est ouvert à tous.
-  Header set X-Robots-Tag "noindex, nofollow"
 </IfModule>
 
 # Forcer HTTPS : retirer les # des trois lignes suivantes une fois le certificat SSL activé chez LWS

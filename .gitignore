@@ -14,3 +14,5 @@ Thumbs.db
 .vscode/
 .idea/
 __pycache__/
+site/livre-dor/config.php
+site/livre-dor/donnees/*.json

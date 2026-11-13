@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /livre-dor/
+
+Sitemap: https://www.iomino.fr/sitemap.xml
