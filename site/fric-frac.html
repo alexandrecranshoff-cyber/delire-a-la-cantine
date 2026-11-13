@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fric-Frac</title>
+<meta name="description" content="Cambriolage tactique au tour par tour dans une villa de Neuilly, la nuit. D'après l'encart de Jeux &amp; Stratégie, 1982. Sur PC.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#11141c">
+<meta property="og:title" content="Fric-Frac">
+<meta property="og:description" content="Cambriolage tactique au tour par tour, sur PC.">
+<meta property="og:image" content="images/fric-frac/apercu.jpg">
+<link rel="icon" href="images/fric-frac/icone.png">
+<link rel="preload" href="fonts/cormorant_garamond.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face { font-family: "Cormorant Garamond"; src: url("fonts/cormorant_garamond.woff2") format("woff2"); font-weight: 300 700; font-display: swap; }
+@font-face { font-family: "EB Garamond"; src: url("fonts/eb_garamond.woff2") format("woff2"); font-weight: 400 800; font-display: swap; }
+
+:root {
+  --nuit: #11141c;
+  --nuit-2: #1a1f2b;
+  --bois: #2a1a10;
+  --bois-clair: #4a2f1c;
+  --laiton: #c9a45a;
+  --laiton-clair: #ead08f;
+  --papier: #efe3c8;
+  --papier-fonce: #d9c8a3;
+  --encre: #241a12;
+  --sang: #9b2420;
+  --gris: #a99c84;
+  --cadre: 1px solid rgba(201,164,90,.55);
+  --titre: "Cormorant Garamond", "EB Garamond", Georgia, serif;
+  --texte: "EB Garamond", Georgia, "Times New Roman", serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--nuit); color: var(--papier);
+  font-family: var(--texte); font-size: 1.2rem; line-height: 1.55; overflow-x: hidden;
+}
+img { display: block; max-width: 100%; height: auto; }
+a { color: inherit; }
+h1, h2, h3 { font-family: var(--titre); font-weight: 600; line-height: 1.02; margin: 0; }
+.wrap { max-width: 1160px; margin: 0 auto; padding-inline: 24px; }
+
+/* Ornement : filet de laiton avec losange */
+.orne { display: flex; align-items: center; gap: 12px; color: var(--laiton); margin: 0 0 14px; font-size: .95rem; letter-spacing: .22em; text-transform: uppercase; }
+.orne::before, .orne::after { content: ""; height: 1px; background: linear-gradient(90deg, transparent, var(--laiton)); flex: 0 0 48px; }
+.orne::after { background: linear-gradient(90deg, var(--laiton), transparent); }
+
+/* ---------- Barre ---------- */
+.barre {
+  position: fixed; inset: 0 0 auto 0; z-index: 20; display: flex; align-items: center; gap: 24px; padding: 10px 24px;
+  background: rgba(17,20,28,.92); backdrop-filter: blur(6px); border-bottom: var(--cadre);
+  transform: translateY(-100%); transition: transform .3s;
+}
+.barre.visible { transform: none; }
+.barre .logo { font-family: var(--titre); font-size: 1.7rem; color: var(--laiton-clair); text-decoration: none; margin-right: auto; }
+.barre a.lien { color: var(--papier); text-decoration: none; font-size: 1.1rem; }
+.barre a.lien:hover { color: var(--laiton-clair); }
+
+/* ---------- Boutons ---------- */
+.bouton {
+  display: inline-flex; flex-direction: column; align-items: center; text-decoration: none;
+  font-family: var(--titre); font-weight: 700; font-size: 1.6rem; letter-spacing: .04em; line-height: 1.05;
+  color: var(--encre); background: linear-gradient(180deg, var(--laiton-clair), var(--laiton) 55%, #a8833c);
+  border: 1px solid #f3e1ad; border-radius: 3px; padding: 12px 30px 10px;
+  box-shadow: 0 0 0 3px var(--bois), 0 0 0 4px var(--laiton), 0 8px 24px rgba(0,0,0,.5);
+  transition: filter .15s, transform .15s;
+}
+.bouton:hover, .bouton:focus-visible { filter: brightness(1.1); transform: translateY(-2px); }
+.bouton small { font-family: var(--texte); font-weight: 400; font-size: 1rem; letter-spacing: 0; margin-top: 3px; }
+.bouton.sobre { background: transparent; color: var(--laiton-clair); border-color: var(--laiton); box-shadow: none; }
+
+/* ---------- Ouverture ---------- */
+.ouverture { position: relative; overflow: hidden; border-bottom: var(--cadre); background: #000; }
+.ouverture img.titre { width: 100%; height: min(92vh, 56vw); object-fit: cover; object-position: center 45%; }
+.ouverture::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(10,12,18,.88) 0%, rgba(10,12,18,.55) 38%, transparent 64%), linear-gradient(0deg, rgba(10,12,18,.8), transparent 30%); pointer-events: none; }
+.ouverture .appel { position: absolute; z-index: 2; left: max(24px, calc((100vw - 1160px) / 2 + 24px)); top: 50%; transform: translateY(-50%); max-width: 520px; }
+.ouverture h1 { font-size: clamp(3.6rem, 9vw, 7.4rem); font-weight: 600; color: var(--laiton-clair); text-shadow: 0 3px 18px rgba(0,0,0,.7); letter-spacing: .01em; }
+.ouverture .accroche { font-family: var(--titre); font-style: italic; font-size: clamp(1.4rem, 2.8vw, 2rem); margin: 6px 0 26px; color: var(--papier); }
+.ouverture .boutons { display: flex; gap: 22px; flex-wrap: wrap; align-items: center; }
+.cachet {
+  position: absolute; z-index: 2; right: 4%; bottom: 9%; width: 140px; height: 140px; border-radius: 50%;
+  display: grid; place-items: center; text-align: center; padding: 14px; transform: rotate(-12deg);
+  background: radial-gradient(circle at 35% 30%, #c0403a, var(--sang) 60%, #5e1310); color: #f5dccb;
+  font-family: var(--titre); font-weight: 700; font-size: 1.2rem; line-height: 1.05;
+  box-shadow: 0 6px 18px rgba(0,0,0,.6), inset 0 0 0 4px rgba(0,0,0,.18), inset 0 0 0 7px rgba(245,220,203,.35);
+}
+
+/* ---------- Bandeau ---------- */
+.bandeau { background: var(--bois); border-bottom: var(--cadre); overflow: hidden; white-space: nowrap; }
+.bandeau div { display: inline-block; padding: 10px 0; font-family: var(--titre); font-size: 1.45rem; color: var(--papier-fonce); animation: defile 34s linear infinite; }
+.bandeau span { margin: 0 22px; }
+.bandeau b { color: var(--laiton); font-weight: normal; }
+@keyframes defile { to { transform: translateX(-50%); } }
+
+/* ---------- Sections ---------- */
+section { padding: 80px 0 24px; position: relative; }
+.titre-section { font-size: clamp(2.6rem, 6.5vw, 4.4rem); color: var(--laiton-clair); margin-bottom: 14px; }
+.chapeau { font-size: 1.4rem; max-width: 660px; margin: 0 0 40px; color: var(--papier-fonce); text-wrap: pretty; }
+
+/* Cadre doré façon tableau */
+.cadre { position: relative; border: 1px solid var(--laiton); padding: 6px; background: linear-gradient(135deg, #5a3a1e, var(--bois) 40%, #6b4626); box-shadow: 0 14px 40px rgba(0,0,0,.55); }
+.cadre img { width: 100%; border: 1px solid rgba(0,0,0,.6); }
+.legende {
+  position: absolute; left: 18px; top: -16px; z-index: 2; background: var(--papier); color: var(--encre);
+  font-family: var(--titre); font-weight: 700; font-size: 1.15rem; padding: 3px 14px; border: 1px solid var(--laiton); letter-spacing: .03em;
+}
+
+/* ---------- Le casse ---------- */
+.scene { display: grid; grid-template-columns: 1.55fr 1fr; gap: 48px; align-items: center; }
+.carnet {
+  background: var(--papier); color: var(--encre); padding: 24px 26px; position: relative; transform: rotate(1deg);
+  background-image: repeating-linear-gradient(0deg, transparent 0 31px, rgba(36,26,18,.12) 31px 32px);
+  box-shadow: 0 12px 30px rgba(0,0,0,.5); font-size: 1.3rem; margin-bottom: 34px;
+}
+.carnet::before { content: ""; position: absolute; left: 50%; top: -10px; width: 70px; height: 22px; transform: translateX(-50%) rotate(-3deg); background: rgba(230,215,170,.75); }
+.chiffres { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.chiffre { border: var(--cadre); background: var(--nuit-2); text-align: center; padding: 12px 8px 10px; }
+.chiffre b { display: block; font-family: var(--titre); font-weight: 700; font-size: 2.6rem; line-height: 1; color: var(--laiton-clair); }
+.chiffre span { display: block; font-size: 1.02rem; line-height: 1.15; color: var(--papier-fonce); margin-top: 4px; }
+
+/* ---------- Planche en trois cases ---------- */
+.planche { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
+.planche article { display: flex; flex-direction: column; background: var(--nuit-2); border: var(--cadre); position: relative; }
+.planche .image { aspect-ratio: 4 / 3; overflow: hidden; border-bottom: var(--cadre); }
+.planche .image img { width: 100%; height: 100%; object-fit: cover; transition: transform .6s; }
+.planche article:hover .image img { transform: scale(1.05); }
+.planche .texte { padding: 16px 20px 22px; flex: 1; }
+.planche h3 { font-size: 1.85rem; color: var(--laiton-clair); margin-bottom: 6px; }
+.planche p { margin: 0; font-size: 1.12rem; color: var(--papier-fonce); }
+
+/* ---------- La villa ---------- */
+.villa { background: var(--bois); border-top: var(--cadre); border-bottom: var(--cadre); margin-top: 90px; padding-bottom: 80px;
+  background-image: repeating-linear-gradient(90deg, rgba(0,0,0,.12) 0 2px, transparent 2px 120px), linear-gradient(180deg, #2f1d11, #22150c); }
+.villa-grille { display: grid; grid-template-columns: 1.4fr 1fr; gap: 26px; }
+.villa-grille .pieces { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-content: start; }
+.vignette { border: 0; padding: 0; background: none; cursor: zoom-in; display: block; width: 100%; color: inherit; font: inherit; text-align: left; }
+.vignette .cadre { transition: transform .2s; }
+.vignette:hover .cadre, .vignette:focus-visible .cadre { transform: translateY(-3px); }
+.vignette span.nom-piece { display: block; margin-top: 8px; font-family: var(--titre); font-size: 1.25rem; color: var(--papier-fonce); }
+
+/* ---------- La bande ---------- */
+.galerie { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
+.portrait { border: 0; padding: 0; background: none; color: inherit; font: inherit; text-align: center; cursor: pointer; }
+.portrait .cadre { aspect-ratio: 3 / 4; overflow: hidden; transition: transform .25s, box-shadow .25s; }
+.portrait .cadre img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
+.portrait:hover .cadre, .portrait:focus-visible .cadre, .portrait.actif .cadre { transform: translateY(-6px); box-shadow: 0 0 0 2px var(--laiton-clair), 0 18px 40px rgba(0,0,0,.6); }
+.portrait .plaque { display: inline-block; margin-top: 14px; padding: 4px 18px; font-family: var(--titre); font-weight: 700; font-size: 1.45rem; color: var(--encre); background: linear-gradient(180deg, var(--laiton-clair), var(--laiton)); border-radius: 2px; }
+.fiche { max-width: 760px; margin: 34px auto 0; background: var(--papier); color: var(--encre); padding: 22px 28px 20px; box-shadow: 0 14px 34px rgba(0,0,0,.5); display: grid; grid-template-columns: 1fr auto; gap: 6px 30px; }
+.fiche h3 { font-size: 2rem; color: var(--sang); grid-column: 1 / -1; }
+.fiche p { margin: 0 0 6px; }
+.fiche ul { margin: 0; padding: 0; list-style: none; min-width: 230px; }
+.fiche li { border-bottom: 1px dotted rgba(36,26,18,.35); padding: 3px 0; font-size: 1.1rem; }
+.fiche li::before { content: "◆ "; color: var(--laiton); font-size: .8em; }
+.fiche .titre-liste { font-family: var(--titre); font-weight: 700; font-size: 1.2rem; }
+
+/* ---------- Les gardes ---------- */
+.gardes { display: grid; grid-template-columns: 300px 1fr; gap: 48px; align-items: center; }
+.gardes .cadre img { aspect-ratio: 3 / 4; object-fit: cover; object-position: center 15%; }
+.regles { list-style: none; margin: 0; padding: 0; }
+.regles li { padding: 12px 0 12px 46px; border-bottom: 1px solid rgba(201,164,90,.25); position: relative; color: var(--papier-fonce); }
+.regles li b { color: var(--laiton-clair); font-weight: 600; }
+.regles li::before { content: attr(data-n); position: absolute; left: 0; top: 10px; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--laiton); color: var(--laiton); display: grid; place-items: center; font-family: var(--titre); font-weight: 700; font-size: 1.1rem; }
+
+/* ---------- Encart d'origine et final ---------- */
+.final { background: var(--nuit-2); border-top: var(--cadre); margin-top: 90px; padding: 80px 0 90px; text-align: center; }
+.final .chapeau { margin: 0 auto 30px; }
+.modes { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin: 0 0 40px; }
+.mode { border: var(--cadre); padding: 6px 16px; font-size: 1.1rem; color: var(--papier-fonce); }
+.mode b { font-family: var(--titre); font-weight: 700; font-size: 1.3rem; color: var(--laiton-clair); margin-right: 6px; }
+.origine { display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin: 10px 0 44px; }
+.origine .vignette { width: 260px; }
+.origine .vignette .cadre img { aspect-ratio: 4 / 3; object-fit: cover; }
+.origine .vignette span.nom-piece { text-align: center; }
+.choix { display: flex; justify-content: center; flex-wrap: wrap; gap: 26px; }
+.bientot { color: var(--gris); font-size: 1.05rem; margin: 22px auto 0; max-width: 620px; }
+
+footer { background: #0b0d12; color: var(--gris); text-align: center; padding: 30px 20px; font-size: .98rem; line-height: 1.55; border-top: var(--cadre); }
+footer a { color: var(--papier); }
+
+/* ---------- Visionneuse ---------- */
+dialog.visionneuse { border: 0; padding: 0; background: transparent; max-width: 100vw; max-height: 100vh; width: 100vw; height: 100vh; }
+dialog.visionneuse::backdrop { background: rgba(6,7,10,.94); }
+.visionneuse figure { margin: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 16px; gap: 10px; cursor: zoom-out; }
+.visionneuse img { max-width: 100%; max-height: calc(100vh - 90px); width: auto; height: auto; object-fit: contain; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+.visionneuse figcaption { color: var(--papier-fonce); font-size: 1.05rem; text-align: center; }
+.visionneuse .fermer { position: fixed; top: 12px; right: 16px; background: none; border: 0; color: #fff; font-size: 2.4rem; line-height: 1; cursor: pointer; }
+
+/* Apparition au défilement */
+.apparait { opacity: 0; translate: 0 36px; transition: opacity .7s, translate .7s; }
+.apparait.vu { opacity: 1; translate: 0 0; }
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+  .apparait { opacity: 1; translate: none; }
+}
+@media (max-width: 900px) {
+  .scene, .villa-grille, .gardes { grid-template-columns: 1fr; }
+  .gardes .cadre { max-width: 300px; margin: 0 auto; }
+  .planche { grid-template-columns: 1fr; max-width: 520px; margin: 0 auto; }
+  .galerie { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .portrait .plaque { font-size: 1.1rem; padding: 3px 10px; }
+  .fiche { grid-template-columns: 1fr; }
+  .barre a.lien { display: none; }
+  .ouverture::after { background: linear-gradient(0deg, rgba(10,12,18,.92) 10%, rgba(10,12,18,.2) 70%); }
+}
+@media (max-width: 600px) {
+  body { font-size: 1.1rem; }
+  .wrap { padding-inline: 16px; }
+  .ouverture img.titre { height: 62vh; }
+  .ouverture .appel { top: auto; bottom: 24px; transform: none; left: 16px; right: 16px; }
+  .ouverture .accroche { margin-bottom: 18px; }
+  .cachet { display: none; }
+  .bouton { font-size: 1.35rem; padding: 10px 20px 8px; }
+  .chiffre b { font-size: 2rem; }
+  .galerie { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .portrait .plaque { font-size: .95rem; padding: 2px 6px; }
+  .villa-grille .pieces { gap: 16px; }
+  .fiche { padding: 18px 18px 16px; }
+}
+</style>
+</head>
+<body>
+
+<nav class="barre" id="barre">
+  <a class="logo" href="#haut">Fric-Frac</a>
+  <a class="lien" href="./">Les jeux</a>
+  <a class="lien" href="#casse">Le casse</a>
+  <a class="lien" href="#villa">La villa</a>
+  <a class="lien" href="#bande">La bande</a>
+  <a class="lien" href="#jouer">Jouer</a>
+</nav>
+
+<header class="ouverture" id="haut">
+  <img class="titre" src="images/fric-frac/titre.webp" srcset="images/fric-frac/titre.webp 1800w, images/fric-frac/titre_2x.webp 2560w" sizes="100vw" alt="La villa de Neuilly, la nuit : un réverbère, la grille, et trois silhouettes qui s'approchent" width="1800" height="1005" fetchpriority="high">
+  <div class="appel">
+    <h1>Fric-Frac</h1>
+    <p class="accroche">Un cambriolage à Neuilly, au tour par tour</p>
+    <div class="boutons">
+      <a class="bouton" href="#casse">Préparer le casse<small>découvrir le jeu</small></a>
+      <a class="bouton sobre" href="#jouer">Sur PC<small>Windows · Linux</small></a>
+    </div>
+  </div>
+  <div class="cachet">D'après<br>l'encart<br>de 1982</div>
+</header>
+
+<div class="bandeau" aria-hidden="true"><div>
+  <span>Tour par tour</span><span><b>◆</b></span><span>6 points d'action</span><span><b>◆</b></span><span>Les dés roulent à l'écran</span><span><b>◆</b></span><span>Chaque geste fait du bruit</span><span><b>◆</b></span><span>Gare aux gardes</span><span><b>◆</b></span>
+  <span>Tour par tour</span><span><b>◆</b></span><span>6 points d'action</span><span><b>◆</b></span><span>Les dés roulent à l'écran</span><span><b>◆</b></span><span>Chaque geste fait du bruit</span><span><b>◆</b></span><span>Gare aux gardes</span><span><b>◆</b></span>
+</div></div>
+
+<main>
+  <section id="casse" class="wrap" aria-labelledby="titre-casse">
+    <p class="orne apparait">Le casse</p>
+    <h2 class="titre-section apparait" id="titre-casse">Ce soir, la rivière de diamants.</h2>
+    <div class="scene">
+      <figure class="cadre apparait" style="margin:0">
+        <img src="images/fric-frac/ecran_partie.webp" alt="Une partie en cours : la villa vue d'en haut, les fiches des voleurs et le carnet du casse" width="1600" height="900" loading="lazy">
+      </figure>
+      <div class="apparait">
+        <p class="carnet">Deux mois que tu observes l'hôtel particulier, ses maîtres et la ronde des gardes. Monsieur vient d'offrir à Madame une rivière de diamants. Ta bande a jusqu'à l'aube pour rafler le plus beau butin… sans réveiller personne.</p>
+        <div class="chiffres">
+          <div class="chiffre"><b>3</b><span>voleurs dans ta bande</span></div>
+          <div class="chiffre"><b>36</b><span>meubles à forcer</span></div>
+          <div class="chiffre"><b>24</b><span>tours avant l'aube</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" aria-labelledby="titre-comment">
+    <p class="orne apparait">La méthode</p>
+    <h2 class="titre-section apparait" id="titre-comment">Comment on joue</h2>
+    <p class="chapeau apparait">Un jeu d'infiltration au tour par tour, qui garde les trois tableaux du livret d'origine.</p>
+    <div class="planche">
+      <article class="apparait">
+        <span class="legende">I · Entre</span>
+        <div class="image"><img src="images/fric-frac/case_rue.webp" alt="La rue devant la villa : réverbères, mur d'enceinte et grille" width="800" height="600" loading="lazy"></div>
+        <div class="texte"><h3>Passe le mur</h3><p>Chaque voleur a 6 points d'action : un point pour un pas, ou pour une colonne du tableau d'effraction. Saute le mur au risque de te fouler la cheville, ou force la grille.</p></div>
+      </article>
+      <article class="apparait">
+        <span class="legende">II · Force</span>
+        <div class="image"><img src="images/fric-frac/case_hall.webp" alt="Le hall de la villa, son dallage, ses armoires et ses secrétaires" width="800" height="600" loading="lazy"></div>
+        <div class="texte"><h3>Ouvre sans bruit</h3><p>Portes, fenêtres, armoires et coffre-fort se forcent. Plus tu vas vite, plus tu fais de bruit : l'onde s'affiche avant chaque geste. Si un garde ou un dormeur l'entend, c'est l'alarme.</p></div>
+      </article>
+      <article class="apparait">
+        <span class="legende">III · Rafle</span>
+        <div class="image"><img src="images/fric-frac/case_des.webp" alt="Le plateau de dés : deux dés d'os sur le tapis vert" width="800" height="600" loading="lazy"></div>
+        <div class="texte"><h3>Lance les dés</h3><p>Les dés roulent à l'écran pour le butin, le saut et les bagarres. Bague, collier, liasse de lettres compromettantes… et peut-être la rivière de diamants.</p></div>
+      </article>
+    </div>
+  </section>
+
+  <section class="villa" id="villa" aria-labelledby="titre-villa">
+    <div class="wrap">
+      <p class="orne apparait">Neuilly</p>
+      <h2 class="titre-section apparait" id="titre-villa">La villa</h2>
+      <p class="chapeau apparait">Le plan de l'encart, case pour case, devenu un manoir de nuit : boiseries, lampes à pétrole et meubles sous leurs housses. Clic sur une pièce pour la voir en grand.</p>
+      <div class="villa-grille apparait">
+        <button class="vignette" type="button" data-grand="images/fric-frac/villa_3d.webp" data-legende="La villa entière, son jardin et son mur d'enceinte">
+          <div class="cadre"><img src="images/fric-frac/villa_3d.webp" alt="La villa vue de haut, avec ses pièces, son jardin et son mur" width="1600" height="900" loading="lazy"></div>
+          <span class="nom-piece">Vue d'ensemble</span>
+        </button>
+        <div class="pieces">
+          <button class="vignette" type="button" data-grand="images/fric-frac/case_salon.webp" data-legende="Le salon"><div class="cadre"><img src="images/fric-frac/case_salon.webp" alt="Le salon" width="800" height="600" loading="lazy"></div><span class="nom-piece">Le salon</span></button>
+          <button class="vignette" type="button" data-grand="images/fric-frac/case_grand_salon.webp" data-legende="Le grand salon"><div class="cadre"><img src="images/fric-frac/case_grand_salon.webp" alt="Le grand salon" width="800" height="600" loading="lazy"></div><span class="nom-piece">Le grand salon</span></button>
+          <button class="vignette" type="button" data-grand="images/fric-frac/case_jardin.webp" data-legende="La terrasse et le jardin"><div class="cadre"><img src="images/fric-frac/case_jardin.webp" alt="La terrasse et le jardin" width="800" height="600" loading="lazy"></div><span class="nom-piece">La terrasse</span></button>
+          <button class="vignette" type="button" data-grand="images/fric-frac/partie_tour.webp" data-legende="Une ronde de garde, en pleine partie"><div class="cadre"><img src="images/fric-frac/partie_tour.webp" alt="Une partie en cours, de nuit" width="1600" height="900" loading="lazy" style="aspect-ratio:4/3;object-fit:cover"></div><span class="nom-piece">En pleine partie</span></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" id="bande" aria-labelledby="titre-bande">
+    <p class="orne apparait">Les voleurs</p>
+    <h2 class="titre-section apparait" id="titre-bande">La bande</h2>
+    <p class="chapeau apparait">Trois voleurs, trois façons d'entrer. Survole ou touche un portrait pour voir sa fiche.</p>
+    <div class="galerie apparait" id="galerie"></div>
+    <div class="fiche apparait" id="fiche" aria-live="polite"></div>
+  </section>
+
+  <section class="wrap" aria-labelledby="titre-gardes">
+    <p class="orne apparait">Et en face</p>
+    <div class="gardes apparait">
+      <figure class="cadre" style="margin:0"><img src="images/fric-frac/perso_garde.webp" alt="Un garde en livrée bleu nuit, casquette et revolver à la ceinture" width="600" height="894" loading="lazy"></figure>
+      <div>
+        <h2 class="titre-section" id="titre-gardes">Les gardes</h2>
+        <ul class="regles">
+          <li data-n="1"><b>Leur ronde va tout droit.</b> À chaque obstacle, un dé choisit leur nouvelle direction.</li>
+          <li data-n="2"><b>Ils parcourent 6 cases par tour</b>, et 12 dès la première alerte, jusqu'à la fin.</li>
+          <li data-n="3"><b>Tu ne vois que les pièces où se tiennent tes voleurs.</b> Un garde hors de vue s'entend à 6 cases.</li>
+          <li data-n="4"><b>Des dormeurs se cachent parmi les meubles.</b> Si ton bruit les atteint, comme un garde, ils donnent l'alarme.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="final" id="jouer" aria-labelledby="titre-jouer">
+    <div class="wrap">
+      <p class="orne" style="justify-content:center">Le coup</p>
+      <h2 class="titre-section" id="titre-jouer">À l'aube, on compte</h2>
+      <p class="chapeau">Seul avec ta bande, ou de 2 à 6 joueurs sur le même écran, chacun pour soi.</p>
+      <div class="modes">
+        <span class="mode"><b>Casse en solo</b>trois voleurs, 24 tours</span>
+        <span class="mode"><b>Casse du jour</b>la même villa pour tout le monde</span>
+        <span class="mode"><b>Tour de rôle</b>de 2 à 6 joueurs</span>
+      </div>
+      <p class="orne" style="justify-content:center">L'encart d'origine</p>
+      <div class="origine">
+        <button class="vignette" type="button" data-grand="images/encarts/fric_frac_plateau.webp" data-legende="Le plateau de l'encart (Jeux &amp; Stratégie, 1982)"><div class="cadre"><img src="images/encarts/fric_frac_plateau_mini.webp" alt="Le plateau d'origine de Fric-Frac" width="640" height="474" loading="lazy"></div><span class="nom-piece">Le plateau de 1982</span></button>
+        <button class="vignette" type="button" data-grand="images/encarts/fric_frac_regles.webp" data-legende="La règle du jeu et ses trois tableaux (Jeux &amp; Stratégie, 1982)"><div class="cadre"><img src="images/encarts/fric_frac_regles_mini.webp" alt="Les pages de règles de Fric-Frac" width="640" height="432" loading="lazy"></div><span class="nom-piece">La règle du livret</span></button>
+      </div>
+      <div class="choix">
+        <span class="bouton" aria-disabled="true" style="cursor:default;filter:saturate(.6)">Bientôt sur PC<small>Windows · Linux</small></span>
+        <a class="bouton sobre" href="./">Les autres jeux<small>Jeux &amp; Stratégie rejoué</small></a>
+      </div>
+      <p class="bientot">Le jeu est en cours de fabrication. Les versions Windows et Linux seront à télécharger ici dès les premiers essais terminés.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  D'après le jeu de plateau <i>Fric-Frac</i> de François Nédélec, plateau dessiné par Claude Lacroix, paru en encart de <i>Jeux &amp; Stratégie</i> en 1982.<br>
+  <a href="./">Les autres jeux de Jeux &amp; Stratégie adaptés en jeu vidéo</a><br>
+  Adaptation non commerciale, projet personnel. Moteur Godot. Polices Cormorant Garamond et EB Garamond (licence SIL Open Font).
+</footer>
+
+<dialog class="visionneuse" id="visionneuse" aria-label="Image en grand format">
+  <button class="fermer" type="button" aria-label="Fermer">×</button>
+  <figure><img id="visionneuse-image" alt=""><figcaption id="visionneuse-legende"></figcaption></figure>
+</dialog>
+
+<script>
+// Tenues du solo, d'après data/regles_video.json et data/equipement.json du dépôt fric-frac
+var bande = [
+  { id: "apache", nom: "L'Apache", role: "Marinière, foulard rouge et casquette. Vif, discret, et la lame jamais bien loin.", equipement: ["Couteau", "Chaussures silencieuses"] },
+  { id: "chatte", nom: "La Chatte", role: "Tout en noir, foulard sur le nez. Elle passe là où personne ne passe, et encaisse mieux qu'on ne croit.", equipement: ["Chaussures silencieuses", "Pare-balles (2)"] },
+  { id: "gros_bras", nom: "Le Gros bras", role: "Des épaules de déménageur et un trousseau de passe-partout. Les serrures lui résistent moins longtemps.", equipement: ["Matraque", "Passe-partout (1 tour)"] }
+];
+var galerie = document.getElementById("galerie"), fiche = document.getElementById("fiche");
+galerie.innerHTML = bande.map(function (p, i) {
+  return '<button class="portrait" type="button" data-i="' + i + '"><div class="cadre"><img src="images/fric-frac/perso_' + p.id + '.webp" alt="' + p.nom + '" width="600" height="804" loading="lazy"></div><span class="plaque">' + p.nom + '</span></button>';
+}).join("");
+var actuel = null;
+function montre(el, defile) {
+  if (!el || el === actuel) return;
+  actuel = el;
+  var p = bande[+el.dataset.i];
+  fiche.innerHTML = '<h3>' + p.nom + '</h3><p>' + p.role + '</p><ul><li class="titre-liste" style="list-style:none">Équipement</li>' +
+    p.equipement.map(function (e) { return '<li>' + e + '</li>'; }).join("") + '</ul>';
+  galerie.querySelectorAll(".portrait").forEach(function (x) { x.classList.toggle("actif", x === el); });
+  if (defile && fiche.getBoundingClientRect().bottom > innerHeight) fiche.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+galerie.querySelectorAll(".portrait").forEach(function (el) {
+  el.addEventListener("mouseenter", function () { montre(el, false); });
+  el.addEventListener("focus", function () { montre(el, false); });
+  el.addEventListener("click", function () { montre(el, true); });
+});
+montre(galerie.querySelector(".portrait"), false);
+
+// Visionneuse : clic gauche sur une image pour la voir en grand, clic ou Échap pour fermer
+var boite = document.getElementById("visionneuse"), grande = document.getElementById("visionneuse-image"), legende = document.getElementById("visionneuse-legende");
+document.querySelectorAll("[data-grand]").forEach(function (b) {
+  b.addEventListener("click", function () {
+    grande.src = b.dataset.grand; grande.alt = b.querySelector("img").alt; legende.textContent = b.dataset.legende || "";
+    boite.showModal();
+  });
+});
+boite.addEventListener("click", function () { boite.close(); });
+boite.addEventListener("close", function () { grande.removeAttribute("src"); });
+
+// Apparition au défilement
+var vus = new IntersectionObserver(function (entrees) {
+  entrees.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("vu"); vus.unobserve(e.target); } });
+}, { threshold: 0.12 });
+document.querySelectorAll(".apparait").forEach(function (el) { vus.observe(el); });
+
+// Barre du haut après l'ouverture
+var barre = document.getElementById("barre"), haut = document.getElementById("haut");
+new IntersectionObserver(function (e) { barre.classList.toggle("visible", !e[0].isIntersecting); }, { threshold: 0.05 }).observe(haut);
+</script>
+</body>
+</html>
