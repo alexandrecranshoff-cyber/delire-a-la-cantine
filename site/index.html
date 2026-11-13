@@ -357,5 +357,26 @@ lettre.addEventListener("submit", function (e) {
 });
 chargeCourrier();
 </script>
+<script>
+// Mesure d'audience sans cookie (livre-dor/mesure.php) : pages vues, jeu lancé, téléchargements
+(function () {
+  if (navigator.doNotTrack === "1" || window.doNotTrack === "1" || !navigator.sendBeacon) return;
+  function mesure(e, c) {
+    try {
+      var d = new FormData();
+      d.append("p", location.pathname); d.append("r", document.referrer); d.append("e", e);
+      if (c) d.append("c", c);
+      navigator.sendBeacon("livre-dor/mesure.php", d);
+    } catch (x) {}
+  }
+  mesure("vue");
+  document.addEventListener("click", function (ev) {
+    var a = ev.target.closest && ev.target.closest("a"); if (!a) return;
+    var h = a.getAttribute("href") || "";
+    if (/\.zip$/.test(h)) mesure("telechargement", h.split("/").pop());
+    else if (/^cantine\/?$/.test(h)) mesure("jeu", "cantine");
+  });
+})();
+</script>
 </body>
 </html>
