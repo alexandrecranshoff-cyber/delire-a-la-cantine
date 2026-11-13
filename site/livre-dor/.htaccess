@@ -1,0 +1,14 @@
+# Courrier des lecteurs : seuls api.php et admin.php sont appelés
+<FilesMatch "^(config|commun)\.php$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+<IfModule mod_headers.c>
+  Header set Cache-Control "no-store"
+  Header set X-Robots-Tag "noindex"
+</IfModule>

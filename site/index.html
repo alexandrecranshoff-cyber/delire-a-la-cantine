@@ -130,6 +130,32 @@ h1, h2, h3 { font-family: var(--titre); font-weight: 700; line-height: 1.02; mar
 .encart.fricfrac .lien-jeu:hover, .encart.fricfrac .lien-jeu:focus-visible { background: #e9cf8f; }
 .encart.fricfrac .statut { color: #c9a45a; }
 
+/* ---------- Courrier des lecteurs ---------- */
+.courrier { border-top: 3px double var(--encre); padding: 56px 0 70px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 48px; align-items: start; }
+.courrier h2 { font-size: clamp(2.2rem, 5vw, 3.2rem); margin-bottom: 10px; grid-column: 1 / -1; }
+.courrier .intro { margin: -10px 0 0; color: var(--gris); grid-column: 1 / -1; max-width: 700px; }
+.lettre { background: var(--papier-clair); border: 2px solid var(--encre); padding: 22px 24px 24px; display: grid; gap: 14px; box-shadow: 8px 8px 0 rgba(22,19,15,.85); }
+.lettre label { display: grid; gap: 4px; font-size: 1rem; letter-spacing: .06em; text-transform: uppercase; color: var(--gris); }
+.lettre input, .lettre select, .lettre textarea {
+  font: inherit; font-size: 1.12rem; text-transform: none; letter-spacing: 0; color: var(--encre);
+  background: #fff; border: 1px solid rgba(22,19,15,.45); border-radius: 0; padding: 8px 10px; width: 100%;
+}
+.lettre textarea { min-height: 150px; resize: vertical; line-height: 1.45; }
+.lettre input:focus-visible, .lettre select:focus-visible, .lettre textarea:focus-visible { outline: 2px solid var(--rouge); outline-offset: 1px; }
+.lettre .piege { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.lettre .bas { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.lettre button { font: inherit; font-size: 1.1rem; letter-spacing: .06em; text-transform: uppercase; background: var(--encre); color: var(--papier-clair); border: 0; padding: 10px 22px 9px; cursor: pointer; }
+.lettre button:hover, .lettre button:focus-visible { background: var(--rouge); }
+.lettre button[disabled] { opacity: .6; cursor: wait; }
+.lettre .etat { font-size: 1rem; margin: 0; }
+.lettre .etat.erreur { color: var(--rouge); }
+.lettres { display: grid; gap: 18px; }
+.lettres article { border-bottom: var(--filet); padding-bottom: 16px; }
+.lettres .signature { font-size: .95rem; color: var(--gris); margin-bottom: 4px; }
+.lettres .signature b { color: var(--encre); font-family: var(--titre); font-size: 1.25rem; letter-spacing: .01em; margin-right: 6px; }
+.lettres .jeu { color: var(--rouge); }
+.lettres p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+.lettres .vide { color: var(--gris); font-style: italic; }
 footer { background: var(--encre); color: #cfc5b2; padding: 30px 0; font-size: 1rem; line-height: 1.55; }
 footer a { color: #fff; }
 
@@ -147,6 +173,7 @@ dialog.visionneuse::backdrop { background: rgba(10,8,6,.92); }
   .couvertures .miniature, .couvertures .miniature img { width: 120px; }
   .revue { grid-template-columns: 1fr; }
   .encart { grid-template-columns: 1fr; }
+  .courrier { grid-template-columns: 1fr; gap: 30px; }
   .encart .visuel { min-height: 0; aspect-ratio: 16 / 9; }
   .hommage { grid-template-columns: 1fr; justify-items: start; }
   .hommage .cachet { width: 104px; height: 104px; font-size: 1.05rem; }
@@ -243,6 +270,19 @@ dialog.visionneuse::backdrop { background: rgba(10,8,6,.92); }
       </div>
     </article>
   </section>
+
+  <section class="courrier" id="courrier" aria-labelledby="titre-courrier">
+    <h2 id="titre-courrier">Le courrier des lecteurs</h2>
+    <p class="intro">Comme dans la revue, la parole est aux lecteurs : un souvenir d'encart, une remarque sur un jeu, une idée pour le prochain. Les messages paraissent après relecture.</p>
+    <form class="lettre" id="lettre" novalidate>
+      <label for="lettre-nom">Ton nom ou pseudo<input id="lettre-nom" name="nom" maxlength="60" autocomplete="nickname" required></label>
+      <label for="lettre-jeu">À propos de<select id="lettre-jeu" name="jeu"><option value="">la revue, le site</option><option value="cantine">Délire à la cantine</option><option value="fric-frac">Fric-Frac</option></select></label>
+      <label for="lettre-message">Ton message<textarea id="lettre-message" name="message" maxlength="2000" required></textarea></label>
+      <div class="piege" aria-hidden="true"><label for="lettre-site">Site web<input id="lettre-site" name="site_web" tabindex="-1" autocomplete="off"></label></div>
+      <div class="bas"><button type="submit" id="lettre-envoyer">Envoyer</button><p class="etat" id="lettre-etat" role="status"></p></div>
+    </form>
+    <div class="lettres" id="lettres" aria-live="polite"><p class="vide">Chargement du courrier…</p></div>
+  </section>
 </main>
 
 <footer>
@@ -272,6 +312,50 @@ document.querySelectorAll(".miniature[data-grand]").forEach(function (b) {
 });
 boite.addEventListener("click", function () { boite.close(); });
 boite.addEventListener("close", function () { grande.removeAttribute("src"); });
+
+// Courrier des lecteurs : messages publiés et envoi, par livre-dor/api.php
+var API = "livre-dor/api.php",
+    lettres = document.getElementById("lettres"),
+    lettre = document.getElementById("lettre"),
+    etat = document.getElementById("lettre-etat"),
+    envoyer = document.getElementById("lettre-envoyer"),
+    ouvert = Date.now(),
+    nomsJeux = { cantine: "Délire à la cantine", "fric-frac": "Fric-Frac" };
+function texte(t) { var d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+function afficheCourrier(liste) {
+  if (!liste.length) { lettres.innerHTML = '<p class="vide">Pas encore de courrier. À toi d\'écrire le premier !</p>'; return; }
+  lettres.innerHTML = liste.map(function (m) {
+    var date = new Date(m.date * 1000).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+    return '<article><div class="signature"><b>' + texte(m.nom) + '</b>' + date +
+      (m.jeu && nomsJeux[m.jeu] ? ' · <span class="jeu">' + nomsJeux[m.jeu] + '</span>' : '') +
+      '</div><p>' + texte(m.message) + '</p></article>';
+  }).join("");
+}
+function chargeCourrier() {
+  fetch(API, { cache: "no-store" }).then(function (r) { if (!r.ok) throw r; return r.json(); })
+    .then(function (d) { afficheCourrier(d.messages || []); })
+    .catch(function () { lettres.innerHTML = '<p class="vide">Le courrier ne peut pas être chargé pour l\'instant.</p>'; });
+}
+lettre.addEventListener("submit", function (e) {
+  e.preventDefault();
+  var donnees = new FormData(lettre);
+  if (!String(donnees.get("nom")).trim() || String(donnees.get("message")).trim().length < 3) {
+    etat.className = "etat erreur"; etat.textContent = "Indique ton nom et écris un message."; return;
+  }
+  donnees.append("ouvert", String(ouvert));
+  envoyer.disabled = true; etat.className = "etat"; etat.textContent = "Envoi…";
+  fetch(API, { method: "POST", body: donnees })
+    .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; }); })
+    .then(function (x) {
+      if (!x.ok) throw new Error(x.d.erreur || "L'envoi a échoué, réessaie dans un moment.");
+      lettre.reset(); ouvert = Date.now();
+      etat.textContent = x.d.moderation ? "Merci ! Ton message paraîtra après relecture." : "Merci, ton message est publié.";
+      if (!x.d.moderation) chargeCourrier();
+    })
+    .catch(function (err) { etat.className = "etat erreur"; etat.textContent = err.message || "L'envoi a échoué, réessaie dans un moment."; })
+    .then(function () { envoyer.disabled = false; });
+});
+chargeCourrier();
 </script>
 </body>
 </html>

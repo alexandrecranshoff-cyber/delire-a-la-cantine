@@ -2,7 +2,7 @@ name: Mise en ligne sur iomino.fr
 
 # Envoie la version web sur l'hébergement LWS par FTP, après chaque export réussi de « Versions du jeu ».
 # Ne fait rien tant que la variable du dépôt MISE_EN_LIGNE ne vaut pas « oui » (Settings › Secrets and variables › Actions › Variables).
-# Secrets : FTP_SERVEUR, FTP_UTILISATEUR, FTP_MOT_DE_PASSE. Variables facultatives : FTP_DOSSIER (htdocs/cantine/ par défaut), FTP_PROTOCOLE (ftps par défaut, ftp si LWS refuse le chiffrement).
+# Secrets : FTP_SERVEUR, FTP_UTILISATEUR, FTP_MOT_DE_PASSE, LIVRE_DOR_MOT_DE_PASSE (administration du courrier des lecteurs). Variables facultatives : FTP_DOSSIER (htdocs/cantine/ par défaut), FTP_PROTOCOLE (ftps par défaut, ftp si LWS refuse le chiffrement).
 on:
   workflow_run:
     workflows: ["Versions du jeu"]
@@ -67,11 +67,18 @@ jobs:
         id: prep
         env:
           FTP_DOSSIER: ${{ vars.FTP_DOSSIER || 'htdocs/cantine/' }}
+          MDP: ${{ secrets.LIVRE_DOR_MOT_DE_PASSE }}
+          MODERATION: ${{ vars.LIVRE_DOR_MODERATION || 'oui' }}
         run: |
           mkdir -p site/telecharger
           (cd pc && chmod +x delire_a_la_cantine.x86_64 && zip -q -9 ../site/telecharger/delire_a_la_cantine_pc_windows.zip delire_a_la_cantine.exe && zip -q -9 ../site/telecharger/delire_a_la_cantine_pc_linux.zip delire_a_la_cantine.x86_64)
           cp deploiement/htaccess-racine site/.htaccess
           rm -f site/.gdignore
+          # Courrier des lecteurs : réglages écrits depuis le secret LIVRE_DOR_MOT_DE_PASSE
+          # (sans lui, admin.php reste fermé) et la variable LIVRE_DOR_MODERATION (« non » pour publier sans relecture)
+          php -r '$m = (string) getenv("MDP"); var_export(["empreinte_mot_de_passe" => $m === "" ? "" : password_hash($m, PASSWORD_DEFAULT), "moderation" => getenv("MODERATION") !== "non"]);' > /tmp/reglages.txt
+          { echo '<?php'; echo 'return'; cat /tmp/reglages.txt; echo ';'; } > site/livre-dor/config.php
+          php -l site/livre-dor/config.php
           # Le site va dans le dossier parent de celui du jeu (FTP_DOSSIER sans « cantine/ »)
           racine="${FTP_DOSSIER%cantine/}"
           echo "dossier=${racine:-./}" >> "$GITHUB_OUTPUT"
