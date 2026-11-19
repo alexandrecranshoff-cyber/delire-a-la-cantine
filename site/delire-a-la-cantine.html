@@ -11,10 +11,14 @@
 <meta property="og:image" content="https://www.iomino.fr/images/apercu.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="675">
+<link rel="alternate" hreflang="fr" href="https://www.iomino.fr/delire-a-la-cantine.html">
+<link rel="alternate" hreflang="en" href="https://www.iomino.fr/en/delire-a-la-cantine.html">
+<link rel="alternate" hreflang="x-default" href="https://www.iomino.fr/delire-a-la-cantine.html">
 <link rel="canonical" href="https://www.iomino.fr/delire-a-la-cantine.html">
 <meta property="og:url" content="https://www.iomino.fr/delire-a-la-cantine.html">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="fr_FR">
+<meta property="og:locale:alternate" content="en_GB">
 <meta property="og:site_name" content="iomino.fr">
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "Délire à la cantine", "url": "https://www.iomino.fr/delire-a-la-cantine.html", "inLanguage": "fr", "genre": ["Tactique au tour par tour", "Stratégie"], "gamePlatform": ["Navigateur web", "Windows", "Linux"], "playMode": ["SinglePlayer", "MultiPlayer"], "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}, "image": "https://www.iomino.fr/images/apercu.jpg", "description": "Bataille de nourriture au tour par tour dans une cantine des années 80, d'après l'encart du n° 14 de Jeux & Stratégie (1982). À jouer dans le navigateur ou sur PC.", "isBasedOn": {"@type": "Game", "name": "Délire à la cantine", "author": [{"@type": "Person", "name": "Didier Guiserix"}, {"@type": "Person", "name": "François Marcela-Froideval"}]}}</script>
@@ -70,6 +74,14 @@ h1, h2, h3 { font-family: var(--titre); font-weight: normal; letter-spacing: .03
 .barre a.lien { color: var(--creme); text-decoration: none; font-size: 1.1rem; }
 .barre a.lien:hover { color: var(--jaune); }
 .barre .bouton { font-size: 1.2rem; padding: 4px 16px; box-shadow: 3px 3px 0 #000; border-width: 3px; }
+
+/* ---------- Langue ---------- */
+.langues { position: absolute; z-index: 5; top: 14px; right: 16px; display: flex; font-family: var(--titre); font-size: 1.2rem; letter-spacing: .06em; border: 3px solid var(--encre); border-radius: 10px; overflow: hidden; box-shadow: 3px 3px 0 var(--encre); background: #fff; }
+.langues a { text-decoration: none; padding: 3px 11px 1px; color: var(--encre); }
+.langues a:hover, .langues a:focus-visible { background: var(--jaune); }
+.langues a[aria-current] { background: var(--rouge); color: #fff; }
+@media (max-width: 600px) { .langues { top: 8px; right: 8px; font-size: .95rem; border-width: 2px; box-shadow: 2px 2px 0 var(--encre); } .langues a { padding: 2px 8px 0; } }
+.barre a.langue { color: var(--jaune); text-decoration: none; font-family: var(--titre); font-size: 1.15rem; letter-spacing: .06em; }
 
 /* ---------- Boutons ---------- */
 .bouton {
@@ -282,10 +294,12 @@ footer { background: var(--encre); color: #d9cfb8; text-align: center; padding: 
   <a class="lien" href="#jeu">Le jeu</a>
   <a class="lien" href="#bande">La bande</a>
   <a class="lien" href="#jouer">Télécharger</a>
+  <a class="langue" href="en/delire-a-la-cantine.html" lang="en" hreflang="en" title="English version">EN</a>
   <a class="bouton" href="cantine/">Jouer</a>
 </nav>
 
 <header class="ouverture" id="haut">
+  <nav class="langues" aria-label="Langue"><a href="delire-a-la-cantine.html" lang="fr" hreflang="fr" aria-current="page">FR</a><a href="en/delire-a-la-cantine.html" lang="en" hreflang="en">EN</a></nav>
   <img class="titre" src="images/titre.webp" srcset="images/titre.webp 1800w, images/titre_2x.webp 2752w" sizes="100vw" alt="Délire à la cantine : le cuisinier et le surveillant fondent sur une cantine en pleine bataille de nourriture" width="1800" height="1005" fetchpriority="high">
   <div class="etiquette">Gratuit<br>sans rien<br>installer</div>
   <div class="appel">

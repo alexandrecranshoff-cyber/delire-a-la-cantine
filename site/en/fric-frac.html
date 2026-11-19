@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fric-Frac</title>
+<meta name="description" content="A turn-based tactical burglary in a Neuilly villa, at night. Based on the board game that came with Jeux &amp; Stratégie no. 16 (1982). On PC, Windows and Linux.">
+<meta name="theme-color" content="#11141c">
+<meta property="og:title" content="Fric-Frac">
+<meta property="og:description" content="A turn-based tactical burglary, on PC.">
+<meta property="og:image" content="https://www.iomino.fr/images/fric-frac/apercu.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<link rel="alternate" hreflang="fr" href="https://www.iomino.fr/fric-frac.html">
+<link rel="alternate" hreflang="en" href="https://www.iomino.fr/en/fric-frac.html">
+<link rel="alternate" hreflang="x-default" href="https://www.iomino.fr/fric-frac.html">
+<link rel="canonical" href="https://www.iomino.fr/en/fric-frac.html">
+<meta property="og:url" content="https://www.iomino.fr/en/fric-frac.html">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_GB">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta property="og:site_name" content="iomino.fr">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "Fric-Frac", "url": "https://www.iomino.fr/en/fric-frac.html", "inLanguage": "fr", "genre": ["Turn-based tactics", "Stealth"], "gamePlatform": ["Windows", "Linux"], "playMode": ["SinglePlayer", "MultiPlayer"], "image": "https://www.iomino.fr/images/fric-frac/apercu.jpg", "description": "A turn-based tactical burglary in a Neuilly villa, at night, based on the board game that came with Jeux & Stratégie no. 16 (1982). In the works, for PC.", "isBasedOn": {"@type": "Game", "name": "Fric-Frac", "author": {"@type": "Person", "name": "François Nédélec"}}}</script>
+<link rel="icon" href="../images/fric-frac/icone.png">
+<link rel="preload" href="../fonts/cormorant_garamond.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face { font-family: "Cormorant Garamond"; src: url("../fonts/cormorant_garamond.woff2") format("woff2"); font-weight: 300 700; font-display: swap; }
+@font-face { font-family: "EB Garamond"; src: url("../fonts/eb_garamond.woff2") format("woff2"); font-weight: 400 800; font-display: swap; }
+
+:root {
+  --nuit: #11141c;
+  --nuit-2: #1a1f2b;
+  --bois: #2a1a10;
+  --bois-clair: #4a2f1c;
+  --laiton: #c9a45a;
+  --laiton-clair: #ead08f;
+  --papier: #efe3c8;
+  --papier-fonce: #d9c8a3;
+  --encre: #241a12;
+  --sang: #9b2420;
+  --gris: #a99c84;
+  --cadre: 1px solid rgba(201,164,90,.55);
+  --titre: "Cormorant Garamond", "EB Garamond", Georgia, serif;
+  --texte: "EB Garamond", Georgia, "Times New Roman", serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--nuit); color: var(--papier);
+  font-family: var(--texte); font-size: 1.2rem; line-height: 1.55; overflow-x: hidden;
+}
+img { display: block; max-width: 100%; height: auto; }
+a { color: inherit; }
+h1, h2, h3 { font-family: var(--titre); font-weight: 600; line-height: 1.02; margin: 0; }
+.wrap { max-width: 1160px; margin: 0 auto; padding-inline: 24px; }
+
+/* Choix de la langue */
+.langues { position: absolute; z-index: 3; top: 16px; right: 18px; display: flex; gap: 4px; font-size: .95rem; letter-spacing: .18em; }
+.langues a { text-decoration: none; padding: 4px 9px 3px 11px; color: var(--papier); border: 1px solid transparent; }
+.langues a:hover, .langues a:focus-visible { color: var(--laiton-clair); }
+.langues a[aria-current] { color: var(--laiton-clair); border-color: var(--laiton); }
+.barre a.langue { color: var(--laiton); text-decoration: none; letter-spacing: .14em; font-size: .95rem; }
+
+/* Ornement : filet de laiton avec losange */
+.orne { display: flex; align-items: center; gap: 12px; color: var(--laiton); margin: 0 0 14px; font-size: .95rem; letter-spacing: .22em; text-transform: uppercase; }
+.orne::before, .orne::after { content: ""; height: 1px; background: linear-gradient(90deg, transparent, var(--laiton)); flex: 0 0 48px; }
+.orne::after { background: linear-gradient(90deg, var(--laiton), transparent); }
+
+/* ---------- Barre ---------- */
+.barre {
+  position: fixed; inset: 0 0 auto 0; z-index: 20; display: flex; align-items: center; gap: 24px; padding: 10px 24px;
+  background: rgba(17,20,28,.92); backdrop-filter: blur(6px); border-bottom: var(--cadre);
+  transform: translateY(-100%); transition: transform .3s;
+}
+.barre.visible { transform: none; }
+.barre .logo { font-family: var(--titre); font-size: 1.7rem; color: var(--laiton-clair); text-decoration: none; margin-right: auto; }
+.barre a.lien { color: var(--papier); text-decoration: none; font-size: 1.1rem; }
+.barre a.lien:hover { color: var(--laiton-clair); }
+
+/* ---------- Boutons ---------- */
+.bouton {
+  display: inline-flex; flex-direction: column; align-items: center; text-decoration: none;
+  font-family: var(--titre); font-weight: 700; font-size: 1.6rem; letter-spacing: .04em; line-height: 1.05;
+  color: var(--encre); background: linear-gradient(180deg, var(--laiton-clair), var(--laiton) 55%, #a8833c);
+  border: 1px solid #f3e1ad; border-radius: 3px; padding: 12px 30px 10px;
+  box-shadow: 0 0 0 3px var(--bois), 0 0 0 4px var(--laiton), 0 8px 24px rgba(0,0,0,.5);
+  transition: filter .15s, transform .15s;
+}
+.bouton:hover, .bouton:focus-visible { filter: brightness(1.1); transform: translateY(-2px); }
+.bouton small { font-family: var(--texte); font-weight: 400; font-size: 1rem; letter-spacing: 0; margin-top: 3px; }
+.bouton.sobre { background: transparent; color: var(--laiton-clair); border-color: var(--laiton); box-shadow: none; }
+
+/* ---------- Ouverture ---------- */
+.ouverture { position: relative; overflow: hidden; border-bottom: var(--cadre); background: #000; }
+.ouverture img.titre { width: 100%; height: min(92vh, 56vw); object-fit: cover; object-position: center 45%; }
+.ouverture::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(10,12,18,.88) 0%, rgba(10,12,18,.55) 38%, transparent 64%), linear-gradient(0deg, rgba(10,12,18,.8), transparent 30%); pointer-events: none; }
+.ouverture .appel { position: absolute; z-index: 2; left: max(24px, calc((100vw - 1160px) / 2 + 24px)); top: 50%; transform: translateY(-50%); max-width: 520px; }
+.ouverture h1 { font-size: clamp(3.6rem, 9vw, 7.4rem); font-weight: 600; color: var(--laiton-clair); text-shadow: 0 3px 18px rgba(0,0,0,.7); letter-spacing: .01em; }
+.ouverture .accroche { font-family: var(--titre); font-style: italic; font-size: clamp(1.4rem, 2.8vw, 2rem); margin: 6px 0 26px; color: var(--papier); }
+.ouverture .boutons { display: flex; gap: 22px; flex-wrap: wrap; align-items: center; }
+.cachet {
+  position: absolute; z-index: 2; right: 4%; bottom: 9%; width: 140px; height: 140px; border-radius: 50%;
+  display: grid; place-items: center; text-align: center; padding: 14px; transform: rotate(-12deg);
+  background: radial-gradient(circle at 35% 30%, #c0403a, var(--sang) 60%, #5e1310); color: #f5dccb;
+  font-family: var(--titre); font-weight: 700; font-size: 1.2rem; line-height: 1.05;
+  box-shadow: 0 6px 18px rgba(0,0,0,.6), inset 0 0 0 4px rgba(0,0,0,.18), inset 0 0 0 7px rgba(245,220,203,.35);
+}
+
+/* ---------- Bandeau ---------- */
+.bandeau { background: var(--bois); border-bottom: var(--cadre); overflow: hidden; white-space: nowrap; }
+.bandeau div { display: inline-block; padding: 10px 0; font-family: var(--titre); font-size: 1.45rem; color: var(--papier-fonce); animation: defile 34s linear infinite; }
+.bandeau span { margin: 0 22px; }
+.bandeau b { color: var(--laiton); font-weight: normal; }
+@keyframes defile { to { transform: translateX(-50%); } }
+
+/* ---------- Sections ---------- */
+section { padding: 80px 0 24px; position: relative; }
+.titre-section { font-size: clamp(2.6rem, 6.5vw, 4.4rem); color: var(--laiton-clair); margin-bottom: 14px; }
+.chapeau { font-size: 1.4rem; max-width: 660px; margin: 0 0 40px; color: var(--papier-fonce); text-wrap: pretty; }
+
+/* Cadre doré façon tableau */
+.cadre { position: relative; border: 1px solid var(--laiton); padding: 6px; background: linear-gradient(135deg, #5a3a1e, var(--bois) 40%, #6b4626); box-shadow: 0 14px 40px rgba(0,0,0,.55); }
+.cadre img { width: 100%; border: 1px solid rgba(0,0,0,.6); }
+.legende {
+  position: absolute; left: 18px; top: -16px; z-index: 2; background: var(--papier); color: var(--encre);
+  font-family: var(--titre); font-weight: 700; font-size: 1.15rem; padding: 3px 14px; border: 1px solid var(--laiton); letter-spacing: .03em;
+}
+
+/* ---------- Le casse ---------- */
+.scene { display: grid; grid-template-columns: 1.55fr 1fr; gap: 48px; align-items: center; }
+.carnet {
+  background: var(--papier); color: var(--encre); padding: 24px 26px; position: relative; transform: rotate(1deg);
+  background-image: repeating-linear-gradient(0deg, transparent 0 31px, rgba(36,26,18,.12) 31px 32px);
+  box-shadow: 0 12px 30px rgba(0,0,0,.5); font-size: 1.3rem; margin-bottom: 34px;
+}
+.carnet::before { content: ""; position: absolute; left: 50%; top: -10px; width: 70px; height: 22px; transform: translateX(-50%) rotate(-3deg); background: rgba(230,215,170,.75); }
+.chiffres { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.chiffre { border: var(--cadre); background: var(--nuit-2); text-align: center; padding: 12px 8px 10px; }
+.chiffre b { display: block; font-family: var(--titre); font-weight: 700; font-size: 2.6rem; line-height: 1; color: var(--laiton-clair); }
+.chiffre span { display: block; font-size: 1.02rem; line-height: 1.15; color: var(--papier-fonce); margin-top: 4px; }
+
+/* ---------- Planche en trois cases ---------- */
+.planche { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
+.planche article { display: flex; flex-direction: column; background: var(--nuit-2); border: var(--cadre); position: relative; }
+.planche .image { aspect-ratio: 4 / 3; overflow: hidden; border-bottom: var(--cadre); }
+.planche .image img { width: 100%; height: 100%; object-fit: cover; transition: transform .6s; }
+.planche article:hover .image img { transform: scale(1.05); }
+.planche .texte { padding: 16px 20px 22px; flex: 1; }
+.planche h3 { font-size: 1.85rem; color: var(--laiton-clair); margin-bottom: 6px; }
+.planche p { margin: 0; font-size: 1.12rem; color: var(--papier-fonce); }
+
+/* ---------- La villa ---------- */
+.villa { background: var(--bois); border-top: var(--cadre); border-bottom: var(--cadre); margin-top: 90px; padding-bottom: 80px;
+  background-image: repeating-linear-gradient(90deg, rgba(0,0,0,.12) 0 2px, transparent 2px 120px), linear-gradient(180deg, #2f1d11, #22150c); }
+.villa-grille { display: grid; grid-template-columns: 1.4fr 1fr; gap: 26px; }
+.villa-grille .pieces { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-content: start; }
+.vignette { border: 0; padding: 0; background: none; cursor: zoom-in; display: block; width: 100%; color: inherit; font: inherit; text-align: left; }
+.vignette .cadre { transition: transform .2s; }
+.vignette:hover .cadre, .vignette:focus-visible .cadre { transform: translateY(-3px); }
+.vignette span.nom-piece { display: block; margin-top: 8px; font-family: var(--titre); font-size: 1.25rem; color: var(--papier-fonce); }
+
+/* ---------- La bande ---------- */
+.galerie { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
+.portrait { border: 0; padding: 0; background: none; color: inherit; font: inherit; text-align: center; cursor: pointer; }
+.portrait .cadre { aspect-ratio: 3 / 4; overflow: hidden; transition: transform .25s, box-shadow .25s; }
+.portrait .cadre img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
+.portrait:hover .cadre, .portrait:focus-visible .cadre, .portrait.actif .cadre { transform: translateY(-6px); box-shadow: 0 0 0 2px var(--laiton-clair), 0 18px 40px rgba(0,0,0,.6); }
+.portrait .plaque { display: inline-block; margin-top: 14px; padding: 4px 18px; font-family: var(--titre); font-weight: 700; font-size: 1.45rem; color: var(--encre); background: linear-gradient(180deg, var(--laiton-clair), var(--laiton)); border-radius: 2px; }
+.fiche { max-width: 760px; margin: 34px auto 0; background: var(--papier); color: var(--encre); padding: 22px 28px 20px; box-shadow: 0 14px 34px rgba(0,0,0,.5); display: grid; grid-template-columns: 1fr auto; gap: 6px 30px; }
+.fiche h3 { font-size: 2rem; color: var(--sang); grid-column: 1 / -1; }
+.fiche p { margin: 0 0 6px; }
+.fiche ul { margin: 0; padding: 0; list-style: none; min-width: 230px; }
+.fiche li { border-bottom: 1px dotted rgba(36,26,18,.35); padding: 3px 0; font-size: 1.1rem; }
+.fiche li::before { content: "◆ "; color: var(--laiton); font-size: .8em; }
+.fiche .titre-liste { font-family: var(--titre); font-weight: 700; font-size: 1.2rem; }
+
+/* ---------- Les gardes ---------- */
+.gardes { display: grid; grid-template-columns: 300px 1fr; gap: 48px; align-items: center; }
+.gardes .cadre img { aspect-ratio: 3 / 4; object-fit: cover; object-position: center 15%; }
+.regles { list-style: none; margin: 0; padding: 0; }
+.regles li { padding: 12px 0 12px 46px; border-bottom: 1px solid rgba(201,164,90,.25); position: relative; color: var(--papier-fonce); }
+.regles li b { color: var(--laiton-clair); font-weight: 600; }
+.regles li::before { content: attr(data-n); position: absolute; left: 0; top: 10px; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--laiton); color: var(--laiton); display: grid; place-items: center; font-family: var(--titre); font-weight: 700; font-size: 1.1rem; }
+
+/* ---------- Encart d'origine et final ---------- */
+.final { background: var(--nuit-2); border-top: var(--cadre); margin-top: 90px; padding: 80px 0 90px; text-align: center; }
+.final .chapeau { margin: 0 auto 30px; }
+.modes { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin: 0 0 40px; }
+.mode { border: var(--cadre); padding: 6px 16px; font-size: 1.1rem; color: var(--papier-fonce); }
+.mode b { font-family: var(--titre); font-weight: 700; font-size: 1.3rem; color: var(--laiton-clair); margin-right: 6px; }
+.origine { display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin: 10px 0 44px; }
+.origine .vignette { width: 260px; }
+.origine .vignette .cadre img { aspect-ratio: 4 / 3; object-fit: cover; }
+.origine .vignette span.nom-piece { text-align: center; }
+.choix { display: flex; justify-content: center; flex-wrap: wrap; gap: 26px; }
+.bientot { color: var(--gris); font-size: 1.05rem; margin: 22px auto 0; max-width: 620px; }
+
+footer { background: #0b0d12; color: var(--gris); text-align: center; padding: 30px 20px; font-size: .98rem; line-height: 1.55; border-top: var(--cadre); }
+footer a { color: var(--papier); }
+
+/* ---------- Visionneuse ---------- */
+dialog.visionneuse { border: 0; padding: 0; background: transparent; max-width: 100vw; max-height: 100vh; width: 100vw; height: 100vh; }
+dialog.visionneuse::backdrop { background: rgba(6,7,10,.94); }
+.visionneuse figure { margin: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 16px; gap: 10px; cursor: zoom-out; }
+.visionneuse img { max-width: 100%; max-height: calc(100vh - 90px); width: auto; height: auto; object-fit: contain; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+.visionneuse figcaption { color: var(--papier-fonce); font-size: 1.05rem; text-align: center; }
+.visionneuse .fermer { position: fixed; top: 12px; right: 16px; background: none; border: 0; color: #fff; font-size: 2.4rem; line-height: 1; cursor: pointer; }
+
+/* Apparition au défilement */
+.apparait { opacity: 0; translate: 0 36px; transition: opacity .7s, translate .7s; }
+.apparait.vu { opacity: 1; translate: 0 0; }
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+  .apparait { opacity: 1; translate: none; }
+}
+@media (max-width: 900px) {
+  .scene, .villa-grille, .gardes { grid-template-columns: 1fr; }
+  .gardes .cadre { max-width: 300px; margin: 0 auto; }
+  .planche { grid-template-columns: 1fr; max-width: 520px; margin: 0 auto; }
+  .galerie { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .portrait .plaque { font-size: 1.1rem; padding: 3px 10px; }
+  .fiche { grid-template-columns: 1fr; }
+  .barre a.lien { display: none; }
+  .ouverture::after { background: linear-gradient(0deg, rgba(10,12,18,.92) 10%, rgba(10,12,18,.2) 70%); }
+}
+@media (max-width: 600px) {
+  body { font-size: 1.1rem; }
+  .wrap { padding-inline: 16px; }
+  .ouverture img.titre { height: 62vh; }
+  .ouverture .appel { top: auto; bottom: 24px; transform: none; left: 16px; right: 16px; }
+  .ouverture .accroche { margin-bottom: 18px; }
+  .cachet { display: none; }
+  .bouton { font-size: 1.35rem; padding: 10px 20px 8px; }
+  .chiffre b { font-size: 2rem; }
+  .galerie { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .portrait .plaque { font-size: .95rem; padding: 2px 6px; }
+  .villa-grille .pieces { gap: 16px; }
+  .fiche { padding: 18px 18px 16px; }
+}
+</style>
+</head>
+<body>
+
+<nav class="barre" id="barre">
+  <a class="logo" href="#haut">Fric-Frac</a>
+  <a class="lien" href="./">The games</a>
+  <a class="lien" href="#casse">The heist</a>
+  <a class="lien" href="#villa">The villa</a>
+  <a class="lien" href="#bande">The gang</a>
+  <a class="lien" href="#jouer">Play</a>
+  <a class="langue" href="../fric-frac.html" lang="fr" hreflang="fr" title="Version française">FR</a>
+</nav>
+
+<header class="ouverture" id="haut">
+  <nav class="langues" aria-label="Language"><a href="../fric-frac.html" lang="fr" hreflang="fr">FR</a><a href="fric-frac.html" lang="en" hreflang="en" aria-current="page">EN</a></nav>
+  <img class="titre" src="../images/fric-frac/titre.webp" srcset="../images/fric-frac/titre.webp 1800w, ../images/fric-frac/titre_2x.webp 2560w" sizes="100vw" alt="The villa in Neuilly, at night: a street lamp, the gate, and three figures creeping up" width="1800" height="1005" fetchpriority="high">
+  <div class="appel">
+    <h1>Fric-Frac</h1>
+    <p class="accroche">A burglary in Neuilly, one turn at a time</p>
+    <div class="boutons">
+      <a class="bouton" href="#casse">Plan the heist<small>discover the game</small></a>
+      <a class="bouton sobre" href="#jouer">On PC<small>Windows · Linux</small></a>
+    </div>
+  </div>
+  <div class="cachet">Based on<br>the 1982<br>insert</div>
+</header>
+
+<div class="bandeau" aria-hidden="true"><div>
+  <span>Turn-based</span><span><b>◆</b></span><span>6 action points</span><span><b>◆</b></span><span>Dice roll on screen</span><span><b>◆</b></span><span>Every move makes noise</span><span><b>◆</b></span><span>Watch out for the guards</span><span><b>◆</b></span>
+  <span>Turn-based</span><span><b>◆</b></span><span>6 action points</span><span><b>◆</b></span><span>Dice roll on screen</span><span><b>◆</b></span><span>Every move makes noise</span><span><b>◆</b></span><span>Watch out for the guards</span><span><b>◆</b></span>
+</div></div>
+
+<main>
+  <section id="casse" class="wrap" aria-labelledby="titre-casse">
+    <p class="orne apparait">The heist</p>
+    <h2 class="titre-section apparait" id="titre-casse">Tonight: the diamond necklace.</h2>
+    <div class="scene">
+      <figure class="cadre apparait" style="margin:0">
+        <img src="../images/fric-frac/ecran_partie.webp" alt="A game in progress: the villa seen from above, the thieves’ cards and the heist notebook" width="1600" height="900" loading="lazy">
+      </figure>
+      <div class="apparait">
+        <p class="carnet">For two months you have been watching the mansion, its owners and the guards’ rounds. Monsieur has just given Madame a diamond necklace. Your gang has until dawn to grab the finest loot… without waking anyone up.</p>
+        <div class="chiffres">
+          <div class="chiffre"><b>3</b><span>thieves in your gang</span></div>
+          <div class="chiffre"><b>36</b><span>pieces of furniture to crack</span></div>
+          <div class="chiffre"><b>24</b><span>turns until dawn</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" aria-labelledby="titre-comment">
+    <p class="orne apparait">The method</p>
+    <h2 class="titre-section apparait" id="titre-comment">How to play</h2>
+    <p class="chapeau apparait">A turn-based stealth game that keeps the three tables from the original rulebook.</p>
+    <div class="planche">
+      <article class="apparait">
+        <span class="legende">I · Get in</span>
+        <div class="image"><img src="../images/fric-frac/case_rue.webp" alt="The street outside the villa: street lamps, the boundary wall and the gate" width="800" height="600" loading="lazy"></div>
+        <div class="texte"><h3>Over the wall</h3><p>Each thief has 6 action points: one point per step, or per column of the break-in table. Jump the wall and risk spraining an ankle, or force the gate.</p></div>
+      </article>
+      <article class="apparait">
+        <span class="legende">II · Break in</span>
+        <div class="image"><img src="../images/fric-frac/case_hall.webp" alt="The villa’s hall, with its tiled floor, its wardrobes and its writing desks" width="800" height="600" loading="lazy"></div>
+        <div class="texte"><h3>Open it quietly</h3><p>Doors, windows, wardrobes and the safe can all be forced. The faster you go, the more noise you make: the sound ripple is shown before every move. If a guard or a sleeper hears it, the alarm goes off.</p></div>
+      </article>
+      <article class="apparait">
+        <span class="legende">III · Grab</span>
+        <div class="image"><img src="../images/fric-frac/case_des.webp" alt="The dice tray: two bone dice on the green baize" width="800" height="600" loading="lazy"></div>
+        <div class="texte"><h3>Roll the dice</h3><p>The dice roll on screen for the loot, the jumps and the fights. A ring, a necklace, a bundle of compromising letters… and maybe Madame’s diamonds.</p></div>
+      </article>
+    </div>
+  </section>
+
+  <section class="villa" id="villa" aria-labelledby="titre-villa">
+    <div class="wrap">
+      <p class="orne apparait">Neuilly</p>
+      <h2 class="titre-section apparait" id="titre-villa">The villa</h2>
+      <p class="chapeau apparait">The floor plan from the insert, space for space, turned into a manor by night: wood panelling, oil lamps and furniture under dust sheets. Click a room to see it full size.</p>
+      <div class="villa-grille apparait">
+        <button class="vignette" type="button" data-grand="../images/fric-frac/villa_3d.webp" data-legende="The whole villa, its garden and its boundary wall">
+          <div class="cadre"><img src="../images/fric-frac/villa_3d.webp" alt="The villa seen from above, with its rooms, its garden and its wall" width="1600" height="900" loading="lazy"></div>
+          <span class="nom-piece">Overview</span>
+        </button>
+        <div class="pieces">
+          <button class="vignette" type="button" data-grand="../images/fric-frac/case_salon.webp" data-legende="The sitting room"><div class="cadre"><img src="../images/fric-frac/case_salon.webp" alt="The sitting room" width="800" height="600" loading="lazy"></div><span class="nom-piece">The sitting room</span></button>
+          <button class="vignette" type="button" data-grand="../images/fric-frac/case_grand_salon.webp" data-legende="The drawing room"><div class="cadre"><img src="../images/fric-frac/case_grand_salon.webp" alt="The drawing room" width="800" height="600" loading="lazy"></div><span class="nom-piece">The drawing room</span></button>
+          <button class="vignette" type="button" data-grand="../images/fric-frac/case_jardin.webp" data-legende="The terrace and the garden"><div class="cadre"><img src="../images/fric-frac/case_jardin.webp" alt="The terrace and the garden" width="800" height="600" loading="lazy"></div><span class="nom-piece">The terrace</span></button>
+          <button class="vignette" type="button" data-grand="../images/fric-frac/partie_tour.webp" data-legende="A guard on his rounds, mid-game"><div class="cadre"><img src="../images/fric-frac/partie_tour.webp" alt="A game in progress, at night" width="1600" height="900" loading="lazy" style="aspect-ratio:4/3;object-fit:cover"></div><span class="nom-piece">Mid-game</span></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" id="bande" aria-labelledby="titre-bande">
+    <p class="orne apparait">The thieves</p>
+    <h2 class="titre-section apparait" id="titre-bande">The gang</h2>
+    <p class="chapeau apparait">Three thieves, three ways in. Hover over or tap a portrait to see their card.</p>
+    <div class="galerie apparait" id="galerie"></div>
+    <div class="fiche apparait" id="fiche" aria-live="polite"></div>
+  </section>
+
+  <section class="wrap" aria-labelledby="titre-gardes">
+    <p class="orne apparait">Facing them</p>
+    <div class="gardes apparait">
+      <figure class="cadre" style="margin:0"><img src="../images/fric-frac/perso_garde.webp" alt="A guard in midnight-blue livery, with a cap and a revolver on his belt" width="600" height="894" loading="lazy"></figure>
+      <div>
+        <h2 class="titre-section" id="titre-gardes">The guards</h2>
+        <ul class="regles">
+          <li data-n="1"><b>Their rounds go straight ahead.</b> At every obstacle, a die picks their new direction.</li>
+          <li data-n="2"><b>They cover 6 spaces per turn</b>, and 12 from the first alert until the end.</li>
+          <li data-n="3"><b>You only see the rooms your thieves are in.</b> A guard out of sight can be heard from 6 spaces away.</li>
+          <li data-n="4"><b>Sleepers are hidden among the furniture.</b> If your noise reaches them, they raise the alarm, just like a guard.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="final" id="jouer" aria-labelledby="titre-jouer">
+    <div class="wrap">
+      <p class="orne" style="justify-content:center">The job</p>
+      <h2 class="titre-section" id="titre-jouer">At dawn, count the loot</h2>
+      <p class="chapeau">On your own with your gang, or 2 to 6 players on the same screen, every thief for themselves.</p>
+      <div class="modes">
+        <span class="mode"><b>Solo heist</b>three thieves, 24 turns</span>
+        <span class="mode"><b>Heist of the day</b>the same villa for everyone</span>
+        <span class="mode"><b>Hot seat</b>2 to 6 players</span>
+      </div>
+      <p class="orne" style="justify-content:center">The original insert</p>
+      <div class="origine">
+        <button class="vignette" type="button" data-grand="../images/encarts/js16_couverture.webp" data-legende="Jeux &amp; Stratégie no. 16 (1982)"><div class="cadre"><img src="../images/encarts/js16_couverture_mini.webp" alt="Cover of Jeux &amp; Stratégie no. 16" width="400" height="523" loading="lazy" style="aspect-ratio:4/3;object-fit:cover;object-position:top"></div><span class="nom-piece">Issue 16</span></button>
+        <button class="vignette" type="button" data-grand="../images/encarts/fric_frac_plateau.webp" data-legende="The board from the insert (Jeux &amp; Stratégie no. 16, 1982)"><div class="cadre"><img src="../images/encarts/fric_frac_plateau_mini.webp" alt="The original board of Fric-Frac" width="640" height="474" loading="lazy"></div><span class="nom-piece">The 1982 board</span></button>
+        <button class="vignette" type="button" data-grand="../images/encarts/fric_frac_regles.webp" data-legende="The rules and their three tables (Jeux &amp; Stratégie no. 16, 1982)"><div class="cadre"><img src="../images/encarts/fric_frac_regles_mini.webp" alt="The Fric-Frac rule pages" width="640" height="432" loading="lazy"></div><span class="nom-piece">The rulebook</span></button>
+      </div>
+      <div class="choix">
+        <span class="bouton" aria-disabled="true" style="cursor:default;filter:saturate(.6)">Coming soon to PC<small>Windows · Linux</small></span>
+        <a class="bouton sobre" href="./">The other games<small>Jeux &amp; Stratégie replayed</small></a>
+      </div>
+      <p class="bientot">The game is still being made. The Windows and Linux versions will be available to download here as soon as the first playtests are over.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Based on the board game <i>Fric-Frac</i> by François Nédélec, board drawn by Claude Lacroix, which came with issue no. 16 of the French magazine <i>Jeux &amp; Stratégie</i> in 1982.<br>
+  <a href="./">The other Jeux &amp; Stratégie games adapted into video games</a><br>
+  A non-commercial adaptation and personal project. Godot engine. Fonts: Cormorant Garamond and EB Garamond (SIL Open Font License).
+</footer>
+
+<dialog class="visionneuse" id="visionneuse" aria-label="Image, full size">
+  <button class="fermer" type="button" aria-label="Close">×</button>
+  <figure><img id="visionneuse-image" alt=""><figcaption id="visionneuse-legende"></figcaption></figure>
+</dialog>
+
+<script>
+// Tenues du solo, d'après data/regles_video.json et data/equipement.json du dépôt fric-frac
+var bande = [
+  { id: "apache", nom: "L'Apache", role: "Striped sailor top, red neckerchief and cap. Quick, quiet, and never far from his blade.", equipement: ["Knife", "Silent shoes"] },
+  { id: "chatte", nom: "La Chatte", role: "All in black, scarf over her nose. She gets through where nobody else can, and takes a beating better than you would think.", equipement: ["Silent shoes", "Bulletproof vest (2)"] },
+  { id: "gros_bras", nom: "Le Gros bras", role: "Shoulders like a removal man and a bunch of skeleton keys. Locks hold out against him for less time.", equipement: ["Cosh", "Skeleton keys (1 turn)"] }
+];
+var galerie = document.getElementById("galerie"), fiche = document.getElementById("fiche");
+galerie.innerHTML = bande.map(function (p, i) {
+  return '<button class="portrait" type="button" data-i="' + i + '"><div class="cadre"><img src="../images/fric-frac/perso_' + p.id + '.webp" alt="' + p.nom + '" width="600" height="804" loading="lazy"></div><span class="plaque">' + p.nom + '</span></button>';
+}).join("");
+var actuel = null;
+function montre(el, defile) {
+  if (!el || el === actuel) return;
+  actuel = el;
+  var p = bande[+el.dataset.i];
+  fiche.innerHTML = '<h3>' + p.nom + '</h3><p>' + p.role + '</p><ul><li class="titre-liste" style="list-style:none">Equipment</li>' +
+    p.equipement.map(function (e) { return '<li>' + e + '</li>'; }).join("") + '</ul>';
+  galerie.querySelectorAll(".portrait").forEach(function (x) { x.classList.toggle("actif", x === el); });
+  if (defile && fiche.getBoundingClientRect().bottom > innerHeight) fiche.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+galerie.querySelectorAll(".portrait").forEach(function (el) {
+  el.addEventListener("mouseenter", function () { montre(el, false); });
+  el.addEventListener("focus", function () { montre(el, false); });
+  el.addEventListener("click", function () { montre(el, true); });
+});
+montre(galerie.querySelector(".portrait"), false);
+
+// Visionneuse : clic gauche sur une image pour la voir en grand, clic ou Échap pour fermer
+var boite = document.getElementById("visionneuse"), grande = document.getElementById("visionneuse-image"), legende = document.getElementById("visionneuse-legende");
+document.querySelectorAll("[data-grand]").forEach(function (b) {
+  b.addEventListener("click", function () {
+    grande.src = b.dataset.grand; grande.alt = b.querySelector("img").alt; legende.textContent = b.dataset.legende || "";
+    boite.showModal();
+  });
+});
+boite.addEventListener("click", function () { boite.close(); });
+boite.addEventListener("close", function () { grande.removeAttribute("src"); });
+
+// Apparition au défilement
+var vus = new IntersectionObserver(function (entrees) {
+  entrees.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("vu"); vus.unobserve(e.target); } });
+}, { threshold: 0.12 });
+document.querySelectorAll(".apparait").forEach(function (el) { vus.observe(el); });
+
+// Barre du haut après l'ouverture
+var barre = document.getElementById("barre"), haut = document.getElementById("haut");
+new IntersectionObserver(function (e) { barre.classList.toggle("visible", !e[0].isIntersecting); }, { threshold: 0.05 }).observe(haut);
+</script>
+<script>
+// Mesure d'audience sans cookie (../livre-dor/mesure.php) : pages vues, jeu lancé, téléchargements
+(function () {
+  if (navigator.doNotTrack === "1" || window.doNotTrack === "1" || !navigator.sendBeacon) return;
+  function mesure(e, c) {
+    try {
+      var d = new FormData();
+      d.append("p", location.pathname); d.append("r", document.referrer); d.append("e", e);
+      if (c) d.append("c", c);
+      navigator.sendBeacon("../livre-dor/mesure.php", d);
+    } catch (x) {}
+  }
+  mesure("vue");
+  document.addEventListener("click", function (ev) {
+    var a = ev.target.closest && ev.target.closest("a"); if (!a) return;
+    var h = a.getAttribute("href") || "";
+    if (/\.zip$/.test(h)) mesure("telechargement", h.split("/").pop());
+    else if (/^(\.\.\/)?cantine\/?$/.test(h)) mesure("jeu", "cantine");
+  });
+})();
+</script>
+</body>
+</html>

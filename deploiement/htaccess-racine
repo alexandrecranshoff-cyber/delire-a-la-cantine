@@ -35,7 +35,7 @@ AddType application/zip .zip
   RewriteRule ^ https://www.%{ENV:DOMAINE}%{REQUEST_URI} [L,R=301]
   RewriteCond %{HTTP_HOST} !^www\. [NC]
   RewriteRule ^ https://www.%{ENV:DOMAINE}%{REQUEST_URI} [L,R=301]
-  # /index.html → / (même page que l'accueil)
-  RewriteCond %{THE_REQUEST} \s/index\.html[\s?] [NC]
-  RewriteRule ^index\.html$ / [L,R=301]
+  # /index.html → / et /en/index.html → /en/ (même page que l'accueil de chaque langue)
+  RewriteCond %{THE_REQUEST} \s/(en/)?index\.html[\s?] [NC]
+  RewriteRule ^(en/)?index\.html$ /$1 [L,R=301]
 </IfModule>

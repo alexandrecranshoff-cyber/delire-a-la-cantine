@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Délire à la cantine</title>
+<meta name="description" content="A turn-based food fight in a 1980s French school canteen, based on the board game that came with Jeux &amp; Stratégie no. 14 (1982). Free to play in your browser or on PC.">
+<meta name="theme-color" content="#1f1a17">
+<meta property="og:title" content="Délire à la cantine">
+<meta property="og:description" content="A turn-based food fight, to play in your browser or on PC.">
+<meta property="og:image" content="https://www.iomino.fr/images/apercu.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<link rel="alternate" hreflang="fr" href="https://www.iomino.fr/delire-a-la-cantine.html">
+<link rel="alternate" hreflang="en" href="https://www.iomino.fr/en/delire-a-la-cantine.html">
+<link rel="alternate" hreflang="x-default" href="https://www.iomino.fr/delire-a-la-cantine.html">
+<link rel="canonical" href="https://www.iomino.fr/en/delire-a-la-cantine.html">
+<meta property="og:url" content="https://www.iomino.fr/en/delire-a-la-cantine.html">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_GB">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta property="og:site_name" content="iomino.fr">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "Délire à la cantine", "url": "https://www.iomino.fr/en/delire-a-la-cantine.html", "inLanguage": "fr", "genre": ["Turn-based tactics", "Strategy"], "gamePlatform": ["Web browser", "Windows", "Linux"], "playMode": ["SinglePlayer", "MultiPlayer"], "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}, "image": "https://www.iomino.fr/images/apercu.jpg", "description": "A turn-based food fight in a 1980s French school canteen, based on the board game that came with Jeux & Stratégie no. 14 (1982). Play it in your browser or on PC.", "isBasedOn": {"@type": "Game", "name": "Délire à la cantine", "author": [{"@type": "Person", "name": "Didier Guiserix"}, {"@type": "Person", "name": "François Marcela-Froideval"}]}}</script>
+<link rel="icon" href="../images/icone.png">
+<link rel="preload" href="../fonts/Bangers-Regular.ttf" as="font" type="font/ttf" crossorigin>
+<style>
+@font-face { font-family: "Bangers"; src: url("../fonts/Bangers-Regular.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "Patrick Hand"; src: url("../fonts/PatrickHand-Regular.ttf") format("truetype"); font-display: swap; }
+
+:root {
+  --encre: #1f1a17;
+  --papier: #fbf3df;
+  --creme: #fff9ec;
+  --turquoise: #22a699;
+  --turquoise-fonce: #15766d;
+  --rose: #f08aa4;
+  --rouge: #e23b2a;
+  --jaune: #ffcc33;
+  --bleu: #2b63c2;
+  --violet: #3b2b5c;
+  --trait: 4px solid var(--encre);
+  --ombre: 6px 6px 0 var(--encre);
+  --titre: "Bangers", Impact, "Arial Black", sans-serif;
+  --texte: "Patrick Hand", "Comic Sans MS", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--papier); color: var(--encre);
+  font-family: var(--texte); font-size: 1.25rem; line-height: 1.45;
+  overflow-x: hidden;
+}
+img { display: block; max-width: 100%; height: auto; }
+a { color: inherit; }
+h1, h2, h3 { font-family: var(--titre); font-weight: normal; letter-spacing: .03em; line-height: 1; margin: 0; }
+.wrap { max-width: 1160px; margin: 0 auto; padding-inline: 20px; }
+
+/* Trame de points façon impression BD */
+.trame {
+  background-image: radial-gradient(rgba(31,26,23,.16) 1.4px, transparent 1.6px);
+  background-size: 12px 12px;
+}
+
+/* ---------- Barre ---------- */
+.barre {
+  position: fixed; inset: 0 0 auto 0; z-index: 20;
+  display: flex; align-items: center; gap: 22px; padding: 10px 20px;
+  background: rgba(31,26,23,.92); backdrop-filter: blur(6px);
+  transform: translateY(-100%); transition: transform .3s;
+}
+.barre.visible { transform: none; }
+.barre .logo { font-family: var(--titre); font-size: 1.6rem; color: var(--jaune); text-decoration: none; margin-right: auto; }
+.barre a.lien { color: var(--creme); text-decoration: none; font-size: 1.1rem; }
+.barre a.lien:hover { color: var(--jaune); }
+.barre .bouton { font-size: 1.2rem; padding: 4px 16px; box-shadow: 3px 3px 0 #000; border-width: 3px; }
+
+/* ---------- Langue ---------- */
+.langues { position: absolute; z-index: 5; top: 14px; right: 16px; display: flex; font-family: var(--titre); font-size: 1.2rem; letter-spacing: .06em; border: 3px solid var(--encre); border-radius: 10px; overflow: hidden; box-shadow: 3px 3px 0 var(--encre); background: #fff; }
+.langues a { text-decoration: none; padding: 3px 11px 1px; color: var(--encre); }
+.langues a:hover, .langues a:focus-visible { background: var(--jaune); }
+.langues a[aria-current] { background: var(--rouge); color: #fff; }
+@media (max-width: 600px) { .langues { top: 8px; right: 8px; font-size: .95rem; border-width: 2px; box-shadow: 2px 2px 0 var(--encre); } .langues a { padding: 2px 8px 0; } }
+.barre a.langue { color: var(--jaune); text-decoration: none; font-family: var(--titre); font-size: 1.15rem; letter-spacing: .06em; }
+
+/* ---------- Boutons ---------- */
+.bouton {
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  font-family: var(--titre); font-size: 2rem; letter-spacing: .04em; line-height: 1;
+  text-decoration: none; color: #fff; background: var(--rouge);
+  padding: 14px 34px 12px; border: var(--trait); border-radius: 12px; box-shadow: var(--ombre);
+  transition: transform .12s, box-shadow .12s;
+}
+.bouton:hover { transform: translate(-3px,-3px) rotate(-1deg); box-shadow: 9px 9px 0 var(--encre); }
+.bouton:active { transform: translate(3px,3px); box-shadow: 2px 2px 0 var(--encre); }
+.bouton small { font-family: var(--texte); font-size: 1rem; letter-spacing: 0; margin-top: 4px; opacity: .95; }
+.bouton.jaune { background: var(--jaune); color: var(--encre); }
+.bouton.bleu { background: var(--bleu); }
+
+/* ---------- Ouverture ---------- */
+.ouverture { position: relative; background: var(--encre); border-bottom: var(--trait); overflow: hidden; }
+.ouverture img.titre { width: 100%; height: min(92vh, 56.25vw); object-fit: cover; object-position: center 30%; }
+.ouverture .appel {
+  position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%);
+  display: flex; gap: 18px; align-items: center; flex-wrap: wrap; justify-content: center; width: max-content; max-width: 94%;
+}
+.accroche { flex-basis: 100%; text-align: center; }
+.accroche span { position: relative; display: inline-block; background: #fff; border: 4px solid var(--encre); border-radius: 22px; padding: 6px 20px; font-size: 1.5rem; box-shadow: 4px 4px 0 var(--encre); transform: rotate(-2deg); }
+.accroche span::after { content: ""; position: absolute; left: 30px; top: -22px; border: 10px solid transparent; border-bottom: 14px solid var(--encre); }
+.lien-pc { display: none; }
+.ouverture .bouton.principal { font-size: 2.6rem; padding: 16px 44px 14px; animation: battement 2.4s ease-in-out infinite; }
+@keyframes battement { 0%,100% { transform: rotate(-2deg) scale(1); } 50% { transform: rotate(-2deg) scale(1.05); } }
+.ouverture .bouton.principal:hover { animation-play-state: paused; }
+.etiquette {
+  position: absolute; bottom: 9%; right: 4%;
+  font-family: var(--titre); font-size: 1.35rem; color: var(--encre); text-align: center; line-height: 1;
+  background: var(--jaune); border: var(--trait); border-radius: 50%; width: 132px; height: 132px;
+  display: grid; place-items: center; transform: rotate(12deg); box-shadow: var(--ombre); padding: 10px;
+}
+
+/* ---------- Bandeau défilant ---------- */
+.bandeau { background: var(--rouge); color: #fff; border-bottom: var(--trait); overflow: hidden; white-space: nowrap; }
+.bandeau div { display: inline-block; padding: 10px 0; font-family: var(--titre); font-size: 1.6rem; letter-spacing: .06em; animation: defile 28s linear infinite; }
+.bandeau span { margin: 0 26px; }
+.bandeau b { color: var(--jaune); font-weight: normal; }
+@keyframes defile { to { transform: translateX(-50%); } }
+
+/* ---------- Sections ---------- */
+section { padding: 72px 0 20px; position: relative; }
+.titre-section { font-size: clamp(2.6rem, 7vw, 4.6rem); color: var(--rouge); text-shadow: 3px 3px 0 var(--encre); -webkit-text-stroke: 1.5px var(--encre); margin-bottom: 14px; }
+.chapeau { font-size: 1.45rem; max-width: 640px; margin: 0 0 40px; text-wrap: balance; }
+
+/* Case de BD */
+.case { background: #fff; border: var(--trait); box-shadow: var(--ombre); position: relative; }
+.case img { width: 100%; }
+.legende {
+  position: absolute; left: -10px; top: -18px; z-index: 2;
+  background: var(--jaune); border: 3px solid var(--encre); padding: 4px 14px;
+  font-family: var(--titre); font-size: 1.35rem; letter-spacing: .04em; transform: rotate(-2deg);
+}
+
+/* ---------- Le jeu ---------- */
+.scene { margin-bottom: 30px; display: grid; grid-template-columns: 1.55fr 1fr; gap: 44px; align-items: center; }
+.scene .case { transform: rotate(-1.2deg); }
+.onomato {
+  position: absolute; z-index: 3; pointer-events: none;
+  font-family: var(--titre); color: var(--jaune); -webkit-text-stroke: 2px var(--encre);
+  text-shadow: 4px 4px 0 var(--encre); line-height: 1;
+}
+.scene .onomato { left: -30px; bottom: -20px; font-size: 5rem; transform: rotate(-8deg); }
+.bulle {
+  position: relative; background: #fff; border: var(--trait); border-radius: 28px;
+  padding: 20px 24px; font-size: 1.4rem; margin-bottom: 34px;
+}
+.bulle::after { content: ""; position: absolute; left: -24px; top: 38px; border: 12px solid transparent; border-right: 18px solid var(--encre); }
+.bulle::before { content: ""; position: absolute; left: -14px; top: 41px; border: 9px solid transparent; border-right: 14px solid #fff; z-index: 1; }
+.chiffres { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.chiffre { background: var(--turquoise); color: #fff; border: 3px solid var(--encre); border-radius: 10px; padding: 10px 8px; text-align: center; box-shadow: 4px 4px 0 var(--encre); }
+.chiffre:nth-child(2) { background: var(--bleu); transform: rotate(1.5deg); }
+.chiffre:nth-child(3) { background: var(--rose); color: var(--encre); transform: rotate(-1.5deg); }
+.chiffre b { display: block; font-family: var(--titre); font-weight: normal; font-size: 2.3rem; line-height: 1; }
+.chiffre span { font-size: 1.05rem; line-height: 1.15; display: block; }
+
+/* ---------- Planche en trois cases ---------- */
+.planche { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; counter-reset: case; }
+.planche .case { display: flex; flex-direction: column; }
+.planche .case:nth-child(2) { transform: translateY(18px) rotate(.8deg); }
+.planche .case:nth-child(3) { transform: rotate(-.8deg); }
+.planche .image { aspect-ratio: 4 / 3; overflow: hidden; border-bottom: var(--trait); background: var(--violet); }
+.planche .image img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s; }
+.planche .case:hover .image img { transform: scale(1.06); }
+.planche .texte { padding: 16px 18px 20px; background: var(--creme); flex: 1; }
+.planche h3 { font-size: 1.9rem; color: var(--turquoise-fonce); margin-bottom: 6px; }
+.planche p { margin: 0; font-size: 1.15rem; }
+.planche .onomato { font-size: 3rem; right: 12px; top: 14px; transform: rotate(-8deg); }
+
+/* ---------- La bande ---------- */
+.bande { background: var(--bleu); border-top: var(--trait); border-bottom: var(--trait); margin-top: 90px; padding: 80px 0 0; overflow: hidden; }
+.bande .titre-section { color: var(--jaune); }
+.bande .chapeau { color: #fff; }
+.rangee { display: flex; justify-content: center; align-items: flex-end; gap: 18px; padding: 30px 20px 0; margin-top: 10px; }
+.perso { position: relative; flex: 0 1 180px; display: flex; flex-direction: column; align-items: center; cursor: pointer; outline: none; }
+.perso img { height: var(--h); width: auto; max-width: none; filter: drop-shadow(1.5px 0 0 var(--encre)) drop-shadow(-1.5px 0 0 var(--encre)) drop-shadow(0 1.5px 0 var(--encre)) drop-shadow(0 -1.5px 0 var(--encre)) drop-shadow(6px 6px 0 rgba(0,0,0,.3)); transition: transform .25s; transform-origin: bottom center; }
+.perso:hover img, .perso:focus img, .perso.actif img { transform: translateY(-10px) rotate(-3deg) scale(1.04); }
+.fiche {
+  display: grid; grid-template-columns: 1.55fr 1fr; align-items: center; max-width: 880px; width: calc(100% - 40px); margin: 22px auto 28px;
+  background: #fff; border: var(--trait); border-radius: 18px; box-shadow: var(--ombre); overflow: hidden; text-align: left;
+}
+.fiche[hidden] { display: none; }
+.planche-perso { background: #fffdf6; border-right: 3px solid var(--encre); align-self: stretch; display: grid; place-items: center; }
+.fiche .planche-perso img { display: block; width: 100%; height: auto; max-width: 100%; filter: none; transform: none; }
+.fiche .corps { padding: 14px 20px 16px; }
+.fiche h3 { color: var(--rouge); font-size: 1.7rem; }
+.fiche p { margin: 2px 0 8px; font-size: 1.02rem; line-height: 1.2; }
+.fiche .stat { display: flex; justify-content: space-between; font-size: 1rem; }
+.fiche .stat b { font-family: var(--titre); font-weight: normal; letter-spacing: .04em; }
+.jauge { height: 10px; border: 2px solid var(--encre); border-radius: 6px; overflow: hidden; margin: 2px 0 6px; background: var(--papier); }
+.jauge i { display: block; height: 100%; background: var(--rouge); }
+.perso.actif .nom { color: var(--jaune); text-decoration: underline 4px; text-underline-offset: 5px; }
+.nom { font-family: var(--titre); color: #fff; font-size: 1.4rem; letter-spacing: .04em; margin: 6px 0 0; text-shadow: 2px 2px 0 var(--encre); }
+.sol { height: 26px; background: var(--encre); margin-top: 6px; }
+
+/* ---------- Adultes ---------- */
+.adultes { display: grid; grid-template-columns: auto 1fr auto; gap: 30px; align-items: end; }
+.adultes img { height: 330px; width: auto; filter: drop-shadow(6px 6px 0 rgba(31,26,23,.25)); transition: transform .25s; transform-origin: bottom center; }
+.adulte { cursor: pointer; outline: none; display: flex; flex-direction: column; align-items: center; }
+.adulte:hover img, .adulte:focus img, .adulte.actif img { transform: translateY(-8px) rotate(-2deg) scale(1.03); }
+.adulte .nom { color: var(--encre); text-shadow: none; }
+.adulte.actif .nom { color: var(--rouge); text-decoration: underline 4px; text-underline-offset: 5px; }
+#fiche-adultes { grid-column: 1 / -1; justify-self: center; margin-top: 0; }
+.adultes .bulle { margin: 0 0 60px; }
+.adultes .bulle::after, .adultes .bulle::before { display: none; }
+.adultes h3 { color: var(--rouge); font-size: 2rem; margin-bottom: 6px; }
+
+/* ---------- À table ---------- */
+.final { background: var(--turquoise); border-top: var(--trait); margin-top: 80px; padding: 80px 0 90px; text-align: center; }
+.final .titre-section { color: var(--jaune); }
+.final .chapeau { color: #fff; margin: 0 auto 34px; }
+.niveaux { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin: 0 0 40px; }
+.niveau { background: #fff; border: 3px solid var(--encre); border-radius: 30px; padding: 6px 18px; font-size: 1.1rem; box-shadow: 3px 3px 0 var(--encre); }
+.niveau b { font-family: var(--titre); font-weight: normal; letter-spacing: .04em; font-size: 1.3rem; margin-right: 6px; }
+.niveau:nth-child(1) b { color: #2f8a3a; } .niveau:nth-child(2) b { color: #c98a10; } .niveau:nth-child(3) b { color: var(--rouge); }
+.choix { display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; }
+.aide { color: #eafffb; font-size: 1.05rem; max-width: 720px; margin: 30px auto 0; }
+.aide summary { cursor: pointer; font-family: var(--texte); font-size: 1.05rem; text-decoration: underline; opacity: .9; color: #fff; }
+.aide p { margin: 10px 0 0; }
+.aide code { font-size: .9em; background: rgba(0,0,0,.18); padding: 1px 6px; border-radius: 4px; }
+
+footer { background: var(--encre); color: #d9cfb8; text-align: center; padding: 28px 20px; font-size: .95rem; line-height: 1.55; }
+
+/* Apparition au défilement */
+.apparait { opacity: 0; translate: 0 40px; transition: opacity .6s, translate .6s; }
+.apparait.vu { opacity: 1; translate: 0 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+  .apparait { opacity: 1; translate: none; }
+}
+@media (max-width: 900px) {
+  .scene, .adultes { grid-template-columns: 1fr; }
+  .adultes { justify-items: center; text-align: center; }
+  .adultes img { height: 240px; }
+  .adultes .bulle { margin: 0; }
+  .adultes { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .adultes img { justify-self: center; }
+  .adultes .bulle { grid-column: 1 / -1; order: 3; }
+  #fiche-adultes { order: 2; margin: 0 auto 14px; }
+  .planche { grid-template-columns: 1fr; max-width: 520px; margin: 0 auto; }
+  .planche .case:nth-child(n) { transform: none; }
+  .rangee { justify-content: flex-start; overflow-x: auto; margin-top: 20px; min-height: 0; scroll-snap-type: x mandatory; -webkit-mask-image: linear-gradient(90deg,#000 92%,transparent); mask-image: linear-gradient(90deg,#000 92%,transparent); padding: 0 40px 0 20px; }
+  .perso { flex: 0 0 140px; scroll-snap-align: center; }
+  .perso img { height: calc(var(--h) * .72); }
+  .sol { margin-top: 0; }
+  .fiche { grid-template-columns: 1fr; max-width: 420px; width: calc(100% - 32px); margin: 14px auto 24px; }
+  .planche-perso { border-right: 0; border-bottom: 3px solid var(--encre); }
+  .adultes .adulte { justify-self: center; }
+  .barre a.lien { display: none; }
+}
+@media (min-width: 901px) and (max-width: 1200px) {
+  .perso { flex-basis: 150px; }
+  .perso img { height: calc(var(--h) * .85); }
+  .ouverture .bouton.principal { font-size: 2.2rem; }
+  .accroche span { font-size: 1.3rem; }
+}
+@media (max-width: 600px) {
+  body { font-size: 1.12rem; }
+  .accroche span { font-size: 1rem; padding: 6px 14px; }
+  .accroche span::after { display: none; }
+  .ouverture .bouton.jaune { display: none; }
+  .lien-pc { display: block; font-size: 1rem; color: var(--jaune); text-decoration: underline; }
+  footer { font-size: .9rem; line-height: 1.5; }
+  .ouverture img.titre { height: auto; }
+  .ouverture .appel { position: static; transform: none; width: auto; max-width: none; padding: 14px 16px 18px; gap: 10px; background: var(--encre); }
+  .ouverture .bouton.principal { font-size: 2rem; }
+  .etiquette { display: none; }
+  .scene .onomato { font-size: 3.4rem; right: -6px; }
+  .chiffre b { font-size: 1.8rem; }
+  section { padding-top: 64px; }
+  .bande { padding-top: 48px; }
+  .adultes h3 { font-size: 1.6rem; }
+  .adultes img { height: 180px; }
+  #fiche-adultes { margin-top: 16px; }
+  .choix { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 340px; margin: 0 auto; }
+  .choix .bouton:first-child { grid-column: 1 / -1; }
+  .choix .bouton { padding-inline: 10px; }
+}
+</style>
+</head>
+<body>
+
+<nav class="barre" id="barre">
+  <a class="logo" href="#haut">Délire à la cantine</a>
+  <a class="lien" href="./">The games</a>
+  <a class="lien" href="#jeu">The game</a>
+  <a class="lien" href="#bande">The gang</a>
+  <a class="lien" href="#jouer">Download</a>
+  <a class="langue" href="../delire-a-la-cantine.html" lang="fr" hreflang="fr" title="Version française">FR</a>
+  <a class="bouton" href="../cantine/">Play</a>
+</nav>
+
+<header class="ouverture" id="haut">
+  <nav class="langues" aria-label="Language"><a href="../delire-a-la-cantine.html" lang="fr" hreflang="fr">FR</a><a href="delire-a-la-cantine.html" lang="en" hreflang="en" aria-current="page">EN</a></nav>
+  <img class="titre" src="../images/titre.webp" srcset="../images/titre.webp 1800w, ../images/titre_2x.webp 2752w" sizes="100vw" alt="Délire à la cantine: the cook and the supervisor swoop down on a school canteen in the middle of a food fight" width="1800" height="1005" fetchpriority="high">
+  <div class="etiquette">Free<br>nothing to<br>install</div>
+  <div class="appel">
+    <p class="accroche" style="margin:0"><span>A tactical food fight, one turn at a time</span></p>
+    <a class="bouton principal" href="../cantine/">Grub’s up! Play<small>free, in your browser</small></a>
+    <a class="bouton jaune" href="#jouer">PC version<small>Windows · Linux</small></a>
+    <a class="lien-pc" href="#jouer">or the PC version ↓</a>
+  </div>
+</header>
+
+<div class="bandeau" aria-hidden="true"><div>
+  <span>Turn-based</span><span><b>★</b></span><span>12 action points</span><span><b>★</b></span><span>Dice roll on screen</span><span><b>★</b></span><span>Mash, tripe, camembert</span><span><b>★</b></span><span>Watch out for the supervisor</span><span><b>★</b></span>
+  <span>Turn-based</span><span><b>★</b></span><span>12 action points</span><span><b>★</b></span><span>Dice roll on screen</span><span><b>★</b></span><span>Mash, tripe, camembert</span><span><b>★</b></span><span>Watch out for the supervisor</span><span><b>★</b></span>
+</div></div>
+
+<main>
+  <section id="jeu" class="wrap">
+    <h2 class="titre-section apparait">Twelve sharp. Things get messy.</h2>
+    <div class="scene">
+      <figure class="case apparait" style="margin:0">
+        <span class="onomato">Splat!</span>
+        <img src="../images/ecran_partie.webp" alt="A game in progress: pink tables, turquoise tiles and two gangs of pupils facing off" width="1600" height="900" loading="lazy">
+      </figure>
+      <div class="apparait">
+        <p class="bulle">The shepherd’s pie is cold, the rillettes are flying low and the supervisor has his whistle out. Your gang of six must be the last one standing when the bell rings.</p>
+        <div class="chiffres">
+          <div class="chiffre"><b>6</b><span>pupils in your gang</span></div>
+          <div class="chiffre"><b>11</b><span>dishes to throw</span></div>
+          <div class="chiffre"><b>20-30</b><span>minutes per game</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" aria-labelledby="comment">
+    <h2 class="titre-section apparait" id="comment">How to play</h2>
+    <p class="chapeau apparait">A turn-based tactics game, like a board game come to life.</p>
+    <div class="planche">
+      <article class="case apparait">
+        <span class="legende">1 · Move</span>
+        <div class="image"><img src="../images/case_avance.webp" alt="A selected pupil and the squares they can reach" width="800" height="600" loading="lazy"></div>
+        <div class="texte"><h3>Place your pupils</h3><p>Each pupil has 12 action points: a step costs 1 point, a throw costs 4. Climb onto a table to get a better aim.</p></div>
+      </article>
+      <article class="case apparait">
+        <span class="legende">2 · Aim</span>
+        <div class="image"><img src="../images/case_des.webp" alt="A pupil hit by a crème caramel, while the dice tray shows the roll" width="800" height="600" loading="lazy"></div>
+        <div class="texte"><h3>Roll the dice</h3><p>Two dice pick the dish. Your dexterity has to beat the distance plus the dish’s difficulty. A hit, and the target loses morale.</p></div>
+      </article>
+      <article class="case apparait">
+        <span class="legende">3 · Hold on</span>
+        <div class="image"><img src="../images/case_cuisine.webp" alt="The kitchen with its trays of mash and tripe and its trolleys" width="800" height="600" loading="lazy"></div>
+        <div class="texte"><h3>Stock up</h3><p>After four turns the plates are empty: dash to the kitchen, its food trays and its trolleys… if the cook lets you through.</p></div>
+      </article>
+    </div>
+  </section>
+
+  <section class="bande trame" id="bande" aria-labelledby="titre-bande">
+    <div class="wrap">
+      <h2 class="titre-section apparait" id="titre-bande">The gang</h2>
+      <p class="chapeau apparait">Six pupils, six personalities. Hover over or tap a pupil to see their character sheet.</p>
+    </div>
+    <div class="rangee" id="rangee"></div>
+    <div class="fiche" id="fiche-bande" aria-live="polite"></div>
+    <div class="sol"></div>
+  </section>
+
+  <section class="wrap" aria-labelledby="titre-adultes">
+    <h2 class="titre-section apparait" id="titre-adultes">And facing them…</h2>
+    <div class="adultes apparait">
+      <div class="adulte" tabindex="0" data-id="prof"><img src="../images/perso_prof.webp" alt="The supervisor in a grey coat, whistle in his mouth" width="468" height="700" loading="lazy"><span class="nom">The supervisor</span></div>
+      <div class="bulle">
+        <h3>The grown-ups aren’t laughing</h3>
+        <p style="margin:0">The <b>supervisor</b> comes in through a random door and marches off the nearest pupil. The <b>cook</b> defends his kitchen and dunks intruders in the dish of the day. And neutral pupils who get hit may join your gang… or go completely berserk.</p>
+      </div>
+      <div class="adulte" tabindex="0" data-id="cuisinier"><img src="../images/perso_cuisinier.webp" alt="The cook, huge and grumpy, ladle in hand" width="464" height="706" loading="lazy"><span class="nom">The cook</span></div>
+      <div class="fiche" id="fiche-adultes" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="final trame" id="jouer" aria-labelledby="titre-jouer">
+    <div class="wrap">
+      <h2 class="titre-section" id="titre-jouer">Grub’s up!</h2>
+      <p class="chapeau">On your own against the computer or two players on the same screen, with three difficulty levels. The game’s menus and texts are in French for now.</p>
+      <div class="niveaux">
+        <span class="niveau"><b>Playtime</b>to get started</span>
+        <span class="niveau"><b>Canteen</b>the game from the rulebook</span>
+        <span class="niveau"><b>Detention</b>no mercy</span>
+      </div>
+      <div class="choix">
+        <a class="bouton" href="../cantine/">Play now<small>in a browser, on a computer ideally</small></a>
+        <a class="bouton jaune" href="../telecharger/delire_a_la_cantine_pc_windows.zip" download>Windows<small>zip, about 80 MB</small></a>
+        <a class="bouton bleu" href="../telecharger/delire_a_la_cantine_pc_linux.zip" download>Linux<small>zip, about 70 MB</small></a>
+      </div>
+      <details class="aide"><summary>Installation help</summary><p>Browser: a recent Chrome, Firefox, Edge or Safari, preferably on a computer. Windows: unzip, then run <code>delire_a_la_cantine.exe</code>; if Windows says it “protected your PC”, click “More info”, then “Run anyway”. Linux: <code>chmod +x delire_a_la_cantine.x86_64</code>, then run it.</p></details>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Based on the board game <i>Délire à la cantine</i> by Didier Guiserix and François Marcela-Froideval, which came with issue no. 14 of the French magazine <i>Jeux &amp; Stratégie</i> in 1982.<br>
+  <a href="./">The other Jeux &amp; Stratégie games adapted into video games</a><br>
+  A non-commercial adaptation and personal project. Godot engine. Fonts: Bangers and Patrick Hand (SIL Open Font License).
+</footer>
+
+<script>
+// Fiches tirées de data/personnages.json du dépôt
+var bande = [
+  { id: "bigleux", nom: "Bigleux", role: "The smallest one, behind enormous glasses. Fragile but precise.", d: "1 die + 1", moral: 30, h: 300 },
+  { id: "grobill", nom: "Grobill", role: "The big lad at the back, always with a handful of mash.", d: "3 dice", moral: 90, h: 330 },
+  { id: "zieugloque", nom: "Zieuglôque", role: "She’s cross-eyed. Nobody ever knows who she’s aiming at.", d: "2 dice", moral: 50, h: 315 },
+  { id: "ledur", nom: "Ledur", role: "Square jaw and tracksuit: nothing makes him back down.", d: "2 dice", moral: 50, h: 330 },
+  { id: "dudugenoux", nom: "Dudugenoux", role: "A karate kid with bandaged knees. The best shot, and the toughest.", d: "4 dice", moral: 100, h: 320 },
+  { id: "delamensa", nom: "Delamensa", role: "Top of the class: protractor, calculator and a steady aim.", d: "1 die + 3", moral: 35, h: 318 }
+];
+var adultes = [
+  { id: "prof", nom: "The supervisor", role: "Bald, grey coat and whistle. He comes in through a random door and marches off the nearest pupil.", d: "throws nothing", moral: 30 },
+  { id: "cuisinier", nom: "The cook", role: "Huge and grumpy, he guards his kitchen and dunks intruders in the dish of the day.", d: "4 dice", moral: 90 }
+];
+function ficheHtml(p) {
+  return '<div class="planche-perso"><img src="../images/fiche_' + p.id + '.webp" alt="Character sheet of ' + p.nom + ': front, three-quarter, side and back views" width="840" height="440"></div>' +
+    '<div class="corps"><h3>' + p.nom + '</h3><p>' + p.role + '</p>' +
+    '<div class="stat"><b>Dexterity</b><span>' + p.d + '</span></div>' +
+    '<div class="stat"><b>Morale</b><span>' + p.moral + '</span></div>' +
+    '<div class="jauge"><i style="width:' + p.moral + '%"></i></div></div>';
+}
+var rangee = document.getElementById("rangee");
+rangee.innerHTML = bande.map(function (p, i) {
+  return '<div class="perso" tabindex="0" data-i="' + i + '" style="--h:' + p.h + 'px">' +
+    '<img src="../images/perso_' + p.id + '.webp" alt="' + p.nom + '" loading="lazy">' +
+    '<span class="nom">' + p.nom + '</span></div>';
+}).join("");
+// Fiche sous les dessins : survol, clavier ou toucher
+function relie(conteneur, selecteur, cadre, donnees, cle) {
+  var actuel = null;
+  function montre(el, defile) {
+    if (!el || el === actuel) return;
+    actuel = el;
+    cadre.innerHTML = ficheHtml(donnees(el));
+    conteneur.querySelectorAll(selecteur).forEach(function (x) { x.classList.toggle("actif", x === el); });
+    if (defile) {
+      var r = cadre.getBoundingClientRect();
+      if (r.bottom > innerHeight) cadre.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }
+  conteneur.querySelectorAll(selecteur).forEach(function (el) {
+    el.addEventListener("mouseenter", function () { montre(el, false); });
+    el.addEventListener("focus", function () { montre(el, false); });
+    el.addEventListener("click", function () { montre(el, true); });
+  });
+  montre(conteneur.querySelector(selecteur), false);
+}
+relie(rangee, ".perso", document.getElementById("fiche-bande"), function (el) { return bande[+el.dataset.i]; });
+var parId = {}; adultes.forEach(function (a) { parId[a.id] = a; });
+relie(document.querySelector(".adultes"), ".adulte", document.getElementById("fiche-adultes"), function (el) { return parId[el.dataset.id]; });
+// Précharge les fiches pour un survol sans attente
+addEventListener("load", function () { bande.concat(adultes).forEach(function (p) { new Image().src = "../images/fiche_" + p.id + ".webp"; }); });
+
+// Apparition au défilement
+var vus = new IntersectionObserver(function (entrees) {
+  entrees.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("vu"); vus.unobserve(e.target); } });
+}, { threshold: 0.15 });
+document.querySelectorAll(".apparait").forEach(function (el) { vus.observe(el); });
+
+// Barre du haut après l'ouverture
+var barre = document.getElementById("barre"), haut = document.getElementById("haut");
+new IntersectionObserver(function (e) { barre.classList.toggle("visible", !e[0].isIntersecting); }, { threshold: 0.05 }).observe(haut);
+</script>
+<script>
+// Mesure d'audience sans cookie (../livre-dor/mesure.php) : pages vues, jeu lancé, téléchargements
+(function () {
+  if (navigator.doNotTrack === "1" || window.doNotTrack === "1" || !navigator.sendBeacon) return;
+  function mesure(e, c) {
+    try {
+      var d = new FormData();
+      d.append("p", location.pathname); d.append("r", document.referrer); d.append("e", e);
+      if (c) d.append("c", c);
+      navigator.sendBeacon("../livre-dor/mesure.php", d);
+    } catch (x) {}
+  }
+  mesure("vue");
+  document.addEventListener("click", function (ev) {
+    var a = ev.target.closest && ev.target.closest("a"); if (!a) return;
+    var h = a.getAttribute("href") || "";
+    if (/\.zip$/.test(h)) mesure("telechargement", h.split("/").pop());
+    else if (/^(\.\.\/)?cantine\/?$/.test(h)) mesure("jeu", "cantine");
+  });
+})();
+</script>
+</body>
+</html>
