@@ -15,7 +15,4 @@ AddType text/javascript .js
   Header set Cache-Control "no-cache"
 </IfModule>
 
-# Forcer HTTPS : retirer les # des trois lignes suivantes une fois le certificat SSL activé chez LWS
-# RewriteEngine On
-# RewriteCond %{HTTPS} off
-# RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# Redirection vers https://www.iomino.fr : faite par le .htaccess de la racine (deploiement/htaccess-racine), qui vaut aussi pour ce dossier
