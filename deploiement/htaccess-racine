@@ -22,7 +22,20 @@ AddType application/zip .zip
   Header set Cache-Control "no-cache"
 </IfModule>
 
-# Forcer HTTPS : retirer les # des trois lignes suivantes une fois le certificat SSL activé chez LWS
-# RewriteEngine On
-# RewriteCond %{HTTPS} off
-# RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# Une seule adresse pour chaque page, celle des adresses canoniques et du sitemap : https://www.iomino.fr/...
+# Sans cela, Google voit les mêmes pages en http et https, avec et sans www, et en écarte une partie comme doublons.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  # http:// ou iomino.fr sans www → https://www.iomino.fr (redirection permanente)
+  # (X-Forwarded-Proto : si l'hébergeur termine le https en amont, la requête arrive en http ; on ne redirige pas en boucle)
+  RewriteCond %{HTTP_HOST} ^(?:www\.)?(.+)$ [NC]
+  RewriteRule ^ - [E=DOMAINE:%1]
+  RewriteCond %{HTTPS} off
+  RewriteCond %{HTTP:X-Forwarded-Proto} !https [NC]
+  RewriteRule ^ https://www.%{ENV:DOMAINE}%{REQUEST_URI} [L,R=301]
+  RewriteCond %{HTTP_HOST} !^www\. [NC]
+  RewriteRule ^ https://www.%{ENV:DOMAINE}%{REQUEST_URI} [L,R=301]
+  # /index.html → / (même page que l'accueil)
+  RewriteCond %{THE_REQUEST} \s/index\.html[\s?] [NC]
+  RewriteRule ^index\.html$ / [L,R=301]
+</IfModule>
