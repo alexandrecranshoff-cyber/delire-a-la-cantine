@@ -11,10 +11,14 @@
 <meta property="og:image" content="https://www.iomino.fr/images/fric-frac/apercu.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="675">
+<link rel="alternate" hreflang="fr" href="https://www.iomino.fr/fric-frac.html">
+<link rel="alternate" hreflang="en" href="https://www.iomino.fr/en/fric-frac.html">
+<link rel="alternate" hreflang="x-default" href="https://www.iomino.fr/fric-frac.html">
 <link rel="canonical" href="https://www.iomino.fr/fric-frac.html">
 <meta property="og:url" content="https://www.iomino.fr/fric-frac.html">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="fr_FR">
+<meta property="og:locale:alternate" content="en_GB">
 <meta property="og:site_name" content="iomino.fr">
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "Fric-Frac", "url": "https://www.iomino.fr/fric-frac.html", "inLanguage": "fr", "genre": ["Tactique au tour par tour", "Infiltration"], "gamePlatform": ["Windows", "Linux"], "playMode": ["SinglePlayer", "MultiPlayer"], "image": "https://www.iomino.fr/images/fric-frac/apercu.jpg", "description": "Cambriolage tactique au tour par tour dans une villa de Neuilly, la nuit, d'après l'encart du n° 16 de Jeux & Stratégie (1982). En préparation, sur PC.", "isBasedOn": {"@type": "Game", "name": "Fric-Frac", "author": {"@type": "Person", "name": "François Nédélec"}}}</script>
@@ -50,6 +54,13 @@ img { display: block; max-width: 100%; height: auto; }
 a { color: inherit; }
 h1, h2, h3 { font-family: var(--titre); font-weight: 600; line-height: 1.02; margin: 0; }
 .wrap { max-width: 1160px; margin: 0 auto; padding-inline: 24px; }
+
+/* Choix de la langue */
+.langues { position: absolute; z-index: 3; top: 16px; right: 18px; display: flex; gap: 4px; font-size: .95rem; letter-spacing: .18em; }
+.langues a { text-decoration: none; padding: 4px 9px 3px 11px; color: var(--papier); border: 1px solid transparent; }
+.langues a:hover, .langues a:focus-visible { color: var(--laiton-clair); }
+.langues a[aria-current] { color: var(--laiton-clair); border-color: var(--laiton); }
+.barre a.langue { color: var(--laiton); text-decoration: none; letter-spacing: .14em; font-size: .95rem; }
 
 /* Ornement : filet de laiton avec losange */
 .orne { display: flex; align-items: center; gap: 12px; color: var(--laiton); margin: 0 0 14px; font-size: .95rem; letter-spacing: .22em; text-transform: uppercase; }
@@ -238,9 +249,11 @@ dialog.visionneuse::backdrop { background: rgba(6,7,10,.94); }
   <a class="lien" href="#villa">La villa</a>
   <a class="lien" href="#bande">La bande</a>
   <a class="lien" href="#jouer">Jouer</a>
+  <a class="langue" href="en/fric-frac.html" lang="en" hreflang="en" title="English version">EN</a>
 </nav>
 
 <header class="ouverture" id="haut">
+  <nav class="langues" aria-label="Langue"><a href="fric-frac.html" lang="fr" hreflang="fr" aria-current="page">FR</a><a href="en/fric-frac.html" lang="en" hreflang="en">EN</a></nav>
   <img class="titre" src="images/fric-frac/titre.webp" srcset="images/fric-frac/titre.webp 1800w, images/fric-frac/titre_2x.webp 2560w" sizes="100vw" alt="La villa de Neuilly, la nuit : un réverbère, la grille, et trois silhouettes qui s'approchent" width="1800" height="1005" fetchpriority="high">
   <div class="appel">
     <h1>Fric-Frac</h1>

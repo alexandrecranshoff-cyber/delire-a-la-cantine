@@ -11,10 +11,14 @@
 <meta property="og:image" content="https://www.iomino.fr/images/apercu_accueil.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<link rel="alternate" hreflang="fr" href="https://www.iomino.fr/">
+<link rel="alternate" hreflang="en" href="https://www.iomino.fr/en/">
+<link rel="alternate" hreflang="x-default" href="https://www.iomino.fr/">
 <link rel="canonical" href="https://www.iomino.fr/">
 <meta property="og:url" content="https://www.iomino.fr/">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="fr_FR">
+<meta property="og:locale:alternate" content="en_GB">
 <meta property="og:site_name" content="iomino.fr">
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebSite", "name": "Jeux & Stratégie, les encarts rejoués", "url": "https://www.iomino.fr/", "inLanguage": "fr", "description": "Hommage à la revue Jeux & Stratégie (1980-1990) : ses jeux de plateau en encart, adaptés en jeux vidéo au tour par tour.", "hasPart": [{"@type": "VideoGame", "name": "Délire à la cantine", "url": "https://www.iomino.fr/delire-a-la-cantine.html"}, {"@type": "VideoGame", "name": "Fric-Frac", "url": "https://www.iomino.fr/fric-frac.html"}]}</script>
@@ -70,6 +74,12 @@ h1, h2, h3 { font-family: var(--titre); font-weight: 700; line-height: 1.02; mar
 .couvertures .miniature:last-child { transform: rotate(4deg) translate(-24px, 14px); }
 .couvertures .miniature span { text-align: center; }
 .chapeau { font-size: clamp(1.3rem, 2.6vw, 1.65rem); line-height: 1.4; max-width: 760px; margin: 26px 0 0; text-wrap: pretty; }
+
+.langues { display: flex; gap: 2px; letter-spacing: .1em; }
+.langues a { text-decoration: none; padding: 0 6px; }
+.langues a:hover, .langues a:focus-visible { color: var(--rouge); }
+.langues a[aria-current] { color: var(--encre); font-weight: 700; border-bottom: 2px solid var(--rouge); }
+.surtitre .droite { display: flex; gap: 18px; align-items: baseline; }
 
 /* ---------- La revue ---------- */
 .revue { padding: 56px 0 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 0 56px; }
@@ -181,7 +191,7 @@ dialog.visionneuse::backdrop { background: rgba(10,8,6,.92); }
 @media (max-width: 520px) {
   body { font-size: 1.1rem; }
   .wrap { padding-inline: 16px; }
-  .surtitre span:last-child { display: none; }
+  .surtitre .date { display: none; }
   .encart .corps { padding: 22px 18px 24px; }
   .miniature, .miniature img { width: 120px; }
   .miniature.haute, .miniature.haute img { width: 69px; }
@@ -195,7 +205,7 @@ dialog.visionneuse::backdrop { background: rgba(10,8,6,.92); }
 
 <header class="couverture">
   <div class="wrap">
-    <div class="surtitre"><span>iomino.fr</span><span>Hommage · 1980-1990 · 2026</span></div>
+    <div class="surtitre"><span>iomino.fr</span><span class="droite"><span class="date">Hommage · 1980-1990 · 2026</span><nav class="langues" aria-label="Langue"><a href="./" lang="fr" hreflang="fr" aria-current="page">FR</a><a href="en/" lang="en" hreflang="en">EN</a></nav></span></div>
     <div class="une"><div>
     <h1 class="titre-revue"><span>Jeux</span><span class="et">&amp;</span><span>Stratégie</span></h1>
     <div class="bandeau-rouge">Les jeux en encart, rejoués en jeux vidéo</div>
